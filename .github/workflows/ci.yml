@@ -1,0 +1,68 @@
+name: Quant MCP CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: SiddarthaKoppaka/stram_data
+          ref: 890b44911b56d0f165cfa7962032d00292b4e10e # pragma: allowlist secret; public commit
+          token: ${{ secrets.STRAM_DATA_READ_TOKEN }}
+          path: stram_data
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          python-version: "3.12"
+          enable-cache: false
+      - name: Install frozen dependencies
+        env:
+          STRAM_DATA_READ_TOKEN: ${{ secrets.STRAM_DATA_READ_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${STRAM_DATA_READ_TOKEN}@github.com/".insteadOf "https://github.com/"
+          trap 'git config --global --unset-all url.https://x-access-token:${STRAM_DATA_READ_TOKEN}@github.com/.insteadOf' EXIT
+          uv sync --frozen --dev
+      - name: Unit and contract tests
+        run: uv run pytest --cov --cov-report=term-missing
+      - name: Type check
+        run: uv run mypy
+      - name: Lint and format
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Contract and schema drift
+        run: uv run python -m stram_quant_mcp.tools.export_schema --check
+      - name: Documentation links, examples, commands and hygiene
+        run: uv run python tools/check_docs.py
+      - name: Dependency vulnerability gate
+        run: uv run pip-audit --local --progress-spinner off --ignore-vuln PYSEC-2026-113
+      - name: Secret gate
+        run: >-
+          uv run detect-secrets scan --all-files
+          --exclude-files '(^|/)(\.git|\.venv|\.mypy_cache|\.pytest_cache|\.ruff_cache|build|contracts|tests/fixtures|uv\.lock)(/|$)'
+          | uv run python tools/check_secret_scan.py
+      - name: License gate
+        run: uv run pip-licenses --format=json | uv run python tools/check_licenses.py
+      - name: Reproducible CycloneDX SBOM
+        run: mkdir -p build && uv run cyclonedx-py environment .venv --pyproject pyproject.toml --output-reproducible --output-file build/sbom.cdx.json && test -s build/sbom.cdx.json
+      - name: Build hardened image with provenance
+        run: |
+          tools/prepare_container_dependency.sh stram_data
+          docker buildx build --pull=false --load --provenance=mode=max --sbom=true --metadata-file build/build-metadata.json --build-arg VCS_REF="$GITHUB_SHA" -t stram-quant-mcp:test .
+          test -s build/build-metadata.json
+      - name: Inspect and preflight image
+        run: |
+          test "$(docker image inspect stram-quant-mcp:test --format '{{.Config.User}}')" = "10001:10001"
+          test "$(docker image inspect stram-quant-mcp:test --format '{{index .Config.Labels "org.opencontainers.image.base.digest"}}')" = "sha256:593bd06efe90efa80dc4eee3948be7c0fde4134606dd40d8dd8dbcade98e669c"
+          docker run --rm --read-only --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m --cap-drop ALL --security-opt no-new-privileges stram-quant-mcp:test worker-network-probe
+          docker run --rm --read-only --network none --cap-drop ALL --security-opt no-new-privileges --mount type=bind,src="$GITHUB_WORKSPACE/tests/fixtures/lake",dst=/lake,readonly --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m stram-quant-mcp:test worker-interface-probe
+          docker run --rm --read-only --network none --cap-drop ALL --security-opt no-new-privileges --mount type=bind,src="$GITHUB_WORKSPACE/tests/fixtures/lake",dst=/lake,readonly --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m stram-quant-mcp:test preflight
+      - name: Image vulnerability gate
+        run: docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.68.1@sha256:a93fd67162843c0f749002af9245fe9a2e5edc41445bd71d3949c803e95ef05b image --scanners vuln --ignore-unfixed --severity HIGH,CRITICAL --format json stram-quant-mcp:test | uv run python tools/check_trivy_scan.py

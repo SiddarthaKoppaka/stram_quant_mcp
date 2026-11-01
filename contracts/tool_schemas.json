@@ -1,0 +1,3841 @@
+{
+  "tools": [
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List bounded quantitative series metadata from the read-only catalog.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "dataset": {
+            "anyOf": [
+              {
+                "enum": [
+                  "economic_observation",
+                  "market_bar",
+                  "positioning_report"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Dataset"
+          },
+          "limit": {
+            "default": 100,
+            "maximum": 500,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "CatalogInput",
+        "type": "object"
+      },
+      "name": "quant_list_series",
+      "outputSchema": {
+        "$defs": {
+          "CatalogData": {
+            "additionalProperties": false,
+            "properties": {
+              "entries": {
+                "items": {
+                  "$ref": "#/$defs/CatalogEntry"
+                },
+                "title": "Entries",
+                "type": "array"
+              }
+            },
+            "required": [
+              "entries"
+            ],
+            "title": "CatalogData",
+            "type": "object"
+          },
+          "CatalogEntry": {
+            "additionalProperties": false,
+            "properties": {
+              "dataset": {
+                "title": "Dataset",
+                "type": "string"
+              },
+              "first_observation": {
+                "format": "date",
+                "title": "First Observation",
+                "type": "string"
+              },
+              "frequency": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Frequency"
+              },
+              "kind": {
+                "title": "Kind",
+                "type": "string"
+              },
+              "last_observation": {
+                "format": "date",
+                "title": "Last Observation",
+                "type": "string"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "provider": {
+                "title": "Provider",
+                "type": "string"
+              },
+              "record_count": {
+                "title": "Record Count",
+                "type": "integer"
+              },
+              "series_key": {
+                "title": "Series Key",
+                "type": "string"
+              },
+              "unit": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Unit"
+              }
+            },
+            "required": [
+              "dataset",
+              "kind",
+              "provider",
+              "series_key",
+              "name",
+              "unit",
+              "frequency",
+              "record_count",
+              "first_observation",
+              "last_observation"
+            ],
+            "title": "CatalogEntry",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/CatalogData"
+          },
+          "interface_version": {
+            "title": "Interface Version",
+            "type": "string"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "stram_data_version": {
+            "title": "Stram Data Version",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tool_version",
+          "stram_data_version",
+          "interface_version",
+          "policy_version",
+          "request_id",
+          "data"
+        ],
+        "title": "ToolEnvelope[CatalogData]",
+        "type": "object"
+      },
+      "schemaHash": "ff9f487ee91ef97b590fae1245ee50db3aa1b3267182257256e59dea81aba383",
+      "scope": "quant:discover"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List derived quantitative indicators and their coverage.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "Closed empty input for parameterless tools.",
+        "properties": {},
+        "title": "EmptyInput",
+        "type": "object"
+      },
+      "name": "quant_list_indicators",
+      "outputSchema": {
+        "$defs": {
+          "IndicatorInfo": {
+            "additionalProperties": false,
+            "properties": {
+              "event_count": {
+                "title": "Event Count",
+                "type": "integer"
+              },
+              "first_observation": {
+                "format": "date",
+                "title": "First Observation",
+                "type": "string"
+              },
+              "formula": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Formula"
+              },
+              "indicator_id": {
+                "title": "Indicator Id",
+                "type": "string"
+              },
+              "indicator_version": {
+                "title": "Indicator Version",
+                "type": "string"
+              },
+              "last_observation": {
+                "format": "date",
+                "title": "Last Observation",
+                "type": "string"
+              },
+              "subject_count": {
+                "title": "Subject Count",
+                "type": "integer"
+              },
+              "unit": {
+                "title": "Unit",
+                "type": "string"
+              }
+            },
+            "required": [
+              "indicator_id",
+              "indicator_version",
+              "unit",
+              "formula",
+              "subject_count",
+              "event_count",
+              "first_observation",
+              "last_observation"
+            ],
+            "title": "IndicatorInfo",
+            "type": "object"
+          },
+          "IndicatorsData": {
+            "additionalProperties": false,
+            "properties": {
+              "indicators": {
+                "items": {
+                  "$ref": "#/$defs/IndicatorInfo"
+                },
+                "title": "Indicators",
+                "type": "array"
+              }
+            },
+            "required": [
+              "indicators"
+            ],
+            "title": "IndicatorsData",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/IndicatorsData"
+          },
+          "interface_version": {
+            "title": "Interface Version",
+            "type": "string"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "stram_data_version": {
+            "title": "Stram Data Version",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tool_version",
+          "stram_data_version",
+          "interface_version",
+          "policy_version",
+          "request_id",
+          "data"
+        ],
+        "title": "ToolEnvelope[IndicatorsData]",
+        "type": "object"
+      },
+      "schemaHash": "2483b5bee1cdb7f73748257a7b3f78e3426b763db06d415a1cdd8108008c4174",
+      "scope": "quant:discover"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List subjects available for one derived indicator.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "indicator_id": {
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:\\-^=/ ]+$",
+            "title": "Indicator Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "indicator_id"
+        ],
+        "title": "IndicatorSubjectsInput",
+        "type": "object"
+      },
+      "name": "quant_list_indicator_subjects",
+      "outputSchema": {
+        "$defs": {
+          "IndicatorSubjectsData": {
+            "additionalProperties": false,
+            "properties": {
+              "subjects": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Subjects",
+                "type": "array"
+              }
+            },
+            "required": [
+              "subjects"
+            ],
+            "title": "IndicatorSubjectsData",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/IndicatorSubjectsData"
+          },
+          "interface_version": {
+            "title": "Interface Version",
+            "type": "string"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "stram_data_version": {
+            "title": "Stram Data Version",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tool_version",
+          "stram_data_version",
+          "interface_version",
+          "policy_version",
+          "request_id",
+          "data"
+        ],
+        "title": "ToolEnvelope[IndicatorSubjectsData]",
+        "type": "object"
+      },
+      "schemaHash": "2ef0007e4e420658ceb97acfd0038ab3232d147ca02faa7657ebf3acb3660b03",
+      "scope": "quant:discover"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Describe the versioned historical-availability policies in force.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "Closed empty input for parameterless tools.",
+        "properties": {},
+        "title": "EmptyInput",
+        "type": "object"
+      },
+      "name": "quant_describe_availability",
+      "outputSchema": {
+        "$defs": {
+          "AvailabilityPoliciesData": {
+            "additionalProperties": false,
+            "properties": {
+              "policies": {
+                "items": {
+                  "$ref": "#/$defs/PolicyInfo"
+                },
+                "title": "Policies",
+                "type": "array"
+              }
+            },
+            "required": [
+              "policies"
+            ],
+            "title": "AvailabilityPoliciesData",
+            "type": "object"
+          },
+          "PolicyInfo": {
+            "additionalProperties": false,
+            "properties": {
+              "applies_to": {
+                "title": "Applies To",
+                "type": "string"
+              },
+              "basis": {
+                "title": "Basis",
+                "type": "string"
+              },
+              "calendar_coverage": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Calendar Coverage"
+              },
+              "enabled": {
+                "default": true,
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "evidence": {
+                "default": "modeled_delay",
+                "enum": [
+                  "verified_vintage",
+                  "official_schedule",
+                  "modeled_delay",
+                  "ingestion_bound",
+                  "hindsight"
+                ],
+                "title": "Evidence",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "estimated_policy",
+                  "source_vintage",
+                  "ingestion_upper_bound",
+                  "ex_post"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Note"
+              },
+              "parameters": {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ]
+                },
+                "title": "Parameters",
+                "type": "object"
+              },
+              "policy_id": {
+                "title": "Policy Id",
+                "type": "string"
+              },
+              "sources": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Sources",
+                "type": "array"
+              },
+              "verified": {
+                "title": "Verified",
+                "type": "boolean"
+              },
+              "version": {
+                "title": "Version",
+                "type": "string"
+              }
+            },
+            "required": [
+              "policy_id",
+              "version",
+              "applies_to",
+              "kind",
+              "verified",
+              "basis",
+              "parameters"
+            ],
+            "title": "PolicyInfo",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/AvailabilityPoliciesData"
+          },
+          "interface_version": {
+            "title": "Interface Version",
+            "type": "string"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "stram_data_version": {
+            "title": "Stram Data Version",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tool_version",
+          "stram_data_version",
+          "interface_version",
+          "policy_version",
+          "request_id",
+          "data"
+        ],
+        "title": "ToolEnvelope[AvailabilityPoliciesData]",
+        "type": "object"
+      },
+      "schemaHash": "8941fb48c186404b5a92520b0d8a2023afbcba58adfc68ca1f75d770b57ff1fc",
+      "scope": "quant:discover"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Report quantitative dataset freshness and known limitations.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "Closed empty input for parameterless tools.",
+        "properties": {},
+        "title": "EmptyInput",
+        "type": "object"
+      },
+      "name": "quant_get_freshness",
+      "outputSchema": {
+        "$defs": {
+          "DatasetFreshness": {
+            "additionalProperties": false,
+            "properties": {
+              "age_hours": {
+                "title": "Age Hours",
+                "type": "number"
+              },
+              "dataset": {
+                "title": "Dataset",
+                "type": "string"
+              },
+              "latest_ingested_at": {
+                "format": "date-time",
+                "title": "Latest Ingested At",
+                "type": "string"
+              },
+              "latest_observation": {
+                "format": "date",
+                "title": "Latest Observation",
+                "type": "string"
+              },
+              "missing_value_count": {
+                "title": "Missing Value Count",
+                "type": "integer"
+              },
+              "provider": {
+                "title": "Provider",
+                "type": "string"
+              },
+              "record_count": {
+                "title": "Record Count",
+                "type": "integer"
+              },
+              "series_count": {
+                "title": "Series Count",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "dataset",
+              "provider",
+              "series_count",
+              "record_count",
+              "latest_observation",
+              "latest_ingested_at",
+              "age_hours",
+              "missing_value_count"
+            ],
+            "title": "DatasetFreshness",
+            "type": "object"
+          },
+          "FreshnessReport": {
+            "additionalProperties": false,
+            "properties": {
+              "datasets": {
+                "items": {
+                  "$ref": "#/$defs/DatasetFreshness"
+                },
+                "title": "Datasets",
+                "type": "array"
+              },
+              "generated_at": {
+                "format": "date-time",
+                "title": "Generated At",
+                "type": "string"
+              },
+              "limitations": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Limitations",
+                "type": "array"
+              }
+            },
+            "required": [
+              "generated_at",
+              "datasets",
+              "limitations"
+            ],
+            "title": "FreshnessReport",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/FreshnessReport"
+          },
+          "interface_version": {
+            "title": "Interface Version",
+            "type": "string"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "stram_data_version": {
+            "title": "Stram Data Version",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tool_version",
+          "stram_data_version",
+          "interface_version",
+          "policy_version",
+          "request_id",
+          "data"
+        ],
+        "title": "ToolEnvelope[FreshnessReport]",
+        "type": "object"
+      },
+      "schemaHash": "e3892b213feb6e0d7a86c3d705f0e690d473c394707b80a668540513f478e761",
+      "scope": "quant:discover"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Read bounded quantitative series with revisions and availability semantics preserved.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "all_versions": {
+            "default": false,
+            "title": "All Versions",
+            "type": "boolean"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "As Of"
+          },
+          "availability": {
+            "default": "strict",
+            "enum": [
+              "strict",
+              "estimated",
+              "ex_post"
+            ],
+            "title": "Availability",
+            "type": "string"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "indicator_ids": {
+            "default": [],
+            "items": {
+              "maxLength": 100,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:\\-^=/ ]+$",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Indicator Ids",
+            "type": "array"
+          },
+          "kinds": {
+            "default": [
+              "economic",
+              "rates",
+              "market_bar",
+              "positioning",
+              "derived"
+            ],
+            "items": {
+              "enum": [
+                "economic",
+                "rates",
+                "market_bar",
+                "positioning",
+                "derived"
+              ],
+              "type": "string"
+            },
+            "title": "Kinds",
+            "type": "array"
+          },
+          "limit": {
+            "default": 100,
+            "maximum": 500,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:\\-^=/ ]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provider"
+          },
+          "series_keys": {
+            "default": [],
+            "items": {
+              "maxLength": 100,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:\\-^=/ ]+$",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Series Keys",
+            "type": "array"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_date",
+          "end_date"
+        ],
+        "title": "SeriesInput",
+        "type": "object"
+      },
+      "name": "quant_get_series",
+      "outputSchema": {
+        "$defs": {
+          "AvailabilitySummary": {
+            "additionalProperties": false,
+            "properties": {
+              "hindsight_only": {
+                "default": false,
+                "title": "Hindsight Only",
+                "type": "boolean"
+              },
+              "mode": {
+                "default": "strict",
+                "enum": [
+                  "strict",
+                  "estimated",
+                  "ex_post"
+                ],
+                "title": "Mode",
+                "type": "string"
+              },
+              "policies": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PolicyInfo"
+                },
+                "title": "Policies",
+                "type": "array"
+              },
+              "unavailable_rows": {
+                "default": 0,
+                "title": "Unavailable Rows",
+                "type": "integer"
+              },
+              "uncovered": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Uncovered",
+                "type": "array"
+              },
+              "warnings": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Warnings",
+                "type": "array"
+              }
+            },
+            "title": "AvailabilitySummary",
+            "type": "object"
+          },
+          "PolicyInfo": {
+            "additionalProperties": false,
+            "properties": {
+              "applies_to": {
+                "title": "Applies To",
+                "type": "string"
+              },
+              "basis": {
+                "title": "Basis",
+                "type": "string"
+              },
+              "calendar_coverage": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Calendar Coverage"
+              },
+              "enabled": {
+                "default": true,
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "evidence": {
+                "default": "modeled_delay",
+                "enum": [
+                  "verified_vintage",
+                  "official_schedule",
+                  "modeled_delay",
+                  "ingestion_bound",
+                  "hindsight"
+                ],
+                "title": "Evidence",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "estimated_policy",
+                  "source_vintage",
+                  "ingestion_upper_bound",
+                  "ex_post"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Note"
+              },
+              "parameters": {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ]
+                },
+                "title": "Parameters",
+                "type": "object"
+              },
+              "policy_id": {
+                "title": "Policy Id",
+                "type": "string"
+              },
+              "sources": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Sources",
+                "type": "array"
+              },
+              "verified": {
+                "title": "Verified",
+                "type": "boolean"
+              },
+              "version": {
+                "title": "Version",
+                "type": "string"
+              }
+            },
+            "required": [
+              "policy_id",
+              "version",
+              "applies_to",
+              "kind",
+              "verified",
+              "basis",
+              "parameters"
+            ],
+            "title": "PolicyInfo",
+            "type": "object"
+          },
+          "RowAvailability": {
+            "additionalProperties": false,
+            "description": "How a value's availability was determined. Never overwrites stored timestamps.",
+            "properties": {
+              "available_at": {
+                "format": "date-time",
+                "title": "Available At",
+                "type": "string"
+              },
+              "capped_by_ingestion": {
+                "default": false,
+                "title": "Capped By Ingestion",
+                "type": "boolean"
+              },
+              "evidence": {
+                "default": "modeled_delay",
+                "enum": [
+                  "verified_vintage",
+                  "official_schedule",
+                  "modeled_delay",
+                  "ingestion_bound",
+                  "hindsight"
+                ],
+                "title": "Evidence",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "estimated_policy",
+                  "source_vintage",
+                  "ingestion_upper_bound",
+                  "ex_post"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "mode": {
+                "enum": [
+                  "strict",
+                  "estimated",
+                  "ex_post"
+                ],
+                "title": "Mode",
+                "type": "string"
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Note"
+              },
+              "policy_id": {
+                "title": "Policy Id",
+                "type": "string"
+              },
+              "policy_version": {
+                "title": "Policy Version",
+                "type": "string"
+              },
+              "precision": {
+                "enum": [
+                  "timestamp",
+                  "date"
+                ],
+                "title": "Precision",
+                "type": "string"
+              },
+              "strict_known_since": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Strict Known Since"
+              },
+              "verified": {
+                "title": "Verified",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "mode",
+              "policy_id",
+              "policy_version",
+              "kind",
+              "verified",
+              "available_at",
+              "precision"
+            ],
+            "title": "RowAvailability",
+            "type": "object"
+          },
+          "SeriesResult": {
+            "additionalProperties": false,
+            "properties": {
+              "all_versions": {
+                "title": "All Versions",
+                "type": "boolean"
+              },
+              "as_of": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "As Of"
+              },
+              "availability": {
+                "$ref": "#/$defs/AvailabilitySummary"
+              },
+              "availability_note": {
+                "title": "Availability Note",
+                "type": "string"
+              },
+              "count": {
+                "title": "Count",
+                "type": "integer"
+              },
+              "limit": {
+                "title": "Limit",
+                "type": "integer"
+              },
+              "rows": {
+                "items": {
+                  "$ref": "#/$defs/SeriesRow"
+                },
+                "title": "Rows",
+                "type": "array"
+              },
+              "truncated": {
+                "title": "Truncated",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "rows",
+              "count",
+              "limit",
+              "truncated",
+              "as_of",
+              "all_versions",
+              "availability_note"
+            ],
+            "title": "SeriesResult",
+            "type": "object"
+          },
+          "SeriesRow": {
+            "additionalProperties": false,
+            "properties": {
+              "availability": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/RowAvailability"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "dataset": {
+                "title": "Dataset",
+                "type": "string"
+              },
+              "event_id": {
+                "title": "Event Id",
+                "type": "string"
+              },
+              "indicator_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Indicator Id"
+              },
+              "ingested_at": {
+                "format": "date-time",
+                "title": "Ingested At",
+                "type": "string"
+              },
+              "is_vintage": {
+                "title": "Is Vintage",
+                "type": "boolean"
+              },
+              "kind": {
+                "title": "Kind",
+                "type": "string"
+              },
+              "known_since": {
+                "format": "date",
+                "title": "Known Since",
+                "type": "string"
+              },
+              "observed_at": {
+                "format": "date-time",
+                "title": "Observed At",
+                "type": "string"
+              },
+              "observed_on": {
+                "format": "date",
+                "title": "Observed On",
+                "type": "string"
+              },
+              "provider": {
+                "title": "Provider",
+                "type": "string"
+              },
+              "quality_flags": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Quality Flags",
+                "type": "array"
+              },
+              "record_id": {
+                "title": "Record Id",
+                "type": "string"
+              },
+              "series_key": {
+                "title": "Series Key",
+                "type": "string"
+              },
+              "unit": {
+                "title": "Unit",
+                "type": "string"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Value"
+              }
+            },
+            "required": [
+              "dataset",
+              "kind",
+              "provider",
+              "series_key",
+              "indicator_id",
+              "observed_at",
+              "observed_on",
+              "value",
+              "unit",
+              "known_since",
+              "is_vintage",
+              "ingested_at",
+              "event_id",
+              "record_id",
+              "quality_flags"
+            ],
+            "title": "SeriesRow",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/SeriesResult"
+          },
+          "interface_version": {
+            "title": "Interface Version",
+            "type": "string"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "stram_data_version": {
+            "title": "Stram Data Version",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tool_version",
+          "stram_data_version",
+          "interface_version",
+          "policy_version",
+          "request_id",
+          "data"
+        ],
+        "title": "ToolEnvelope[SeriesResult]",
+        "type": "object"
+      },
+      "schemaHash": "68dd28b057c2904e18e907b5268bc1b4835d825d9885c3c41c04cdc4ae9b0899",
+      "scope": "quant:read"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Read one bounded derived indicator with exact values and lineage identifiers.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "As Of"
+          },
+          "availability": {
+            "default": "strict",
+            "enum": [
+              "strict",
+              "estimated",
+              "ex_post"
+            ],
+            "title": "Availability",
+            "type": "string"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "indicator_id": {
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:\\-^=/ ]+$",
+            "title": "Indicator Id",
+            "type": "string"
+          },
+          "limit": {
+            "default": 100,
+            "maximum": 500,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:\\-^=/ ]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subject"
+          }
+        },
+        "required": [
+          "start_date",
+          "end_date",
+          "indicator_id"
+        ],
+        "title": "DerivedInput",
+        "type": "object"
+      },
+      "name": "quant_get_derived",
+      "outputSchema": {
+        "$defs": {
+          "AvailabilitySummary": {
+            "additionalProperties": false,
+            "properties": {
+              "hindsight_only": {
+                "default": false,
+                "title": "Hindsight Only",
+                "type": "boolean"
+              },
+              "mode": {
+                "default": "strict",
+                "enum": [
+                  "strict",
+                  "estimated",
+                  "ex_post"
+                ],
+                "title": "Mode",
+                "type": "string"
+              },
+              "policies": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PolicyInfo"
+                },
+                "title": "Policies",
+                "type": "array"
+              },
+              "unavailable_rows": {
+                "default": 0,
+                "title": "Unavailable Rows",
+                "type": "integer"
+              },
+              "uncovered": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Uncovered",
+                "type": "array"
+              },
+              "warnings": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Warnings",
+                "type": "array"
+              }
+            },
+            "title": "AvailabilitySummary",
+            "type": "object"
+          },
+          "DerivedResult": {
+            "additionalProperties": false,
+            "properties": {
+              "as_of": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "As Of"
+              },
+              "availability": {
+                "$ref": "#/$defs/AvailabilitySummary"
+              },
+              "availability_note": {
+                "title": "Availability Note",
+                "type": "string"
+              },
+              "count": {
+                "title": "Count",
+                "type": "integer"
+              },
+              "limit": {
+                "title": "Limit",
+                "type": "integer"
+              },
+              "rows": {
+                "items": {
+                  "$ref": "#/$defs/DerivedRow"
+                },
+                "title": "Rows",
+                "type": "array"
+              },
+              "truncated": {
+                "title": "Truncated",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "rows",
+              "count",
+              "limit",
+              "truncated",
+              "as_of",
+              "availability_note"
+            ],
+            "title": "DerivedResult",
+            "type": "object"
+          },
+          "DerivedRow": {
+            "additionalProperties": false,
+            "properties": {
+              "availability": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/RowAvailability"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "availability_basis": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Availability Basis"
+              },
+              "computed_at": {
+                "format": "date-time",
+                "title": "Computed At",
+                "type": "string"
+              },
+              "event_id": {
+                "title": "Event Id",
+                "type": "string"
+              },
+              "formula": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Formula"
+              },
+              "indicator_id": {
+                "title": "Indicator Id",
+                "type": "string"
+              },
+              "indicator_version": {
+                "title": "Indicator Version",
+                "type": "string"
+              },
+              "input_batch_ids": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Input Batch Ids",
+                "type": "array"
+              },
+              "input_event_ids": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Input Event Ids",
+                "type": "array"
+              },
+              "known_since": {
+                "format": "date",
+                "title": "Known Since",
+                "type": "string"
+              },
+              "licensed_input": {
+                "title": "Licensed Input",
+                "type": "boolean"
+              },
+              "observation_date": {
+                "format": "date",
+                "title": "Observation Date",
+                "type": "string"
+              },
+              "retracted": {
+                "title": "Retracted",
+                "type": "boolean"
+              },
+              "subject": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Subject"
+              },
+              "unit": {
+                "title": "Unit",
+                "type": "string"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Value"
+              }
+            },
+            "required": [
+              "event_id",
+              "indicator_id",
+              "indicator_version",
+              "subject",
+              "observation_date",
+              "value",
+              "unit",
+              "known_since",
+              "computed_at",
+              "input_event_ids",
+              "input_batch_ids",
+              "availability_basis",
+              "formula",
+              "licensed_input",
+              "retracted"
+            ],
+            "title": "DerivedRow",
+            "type": "object"
+          },
+          "PolicyInfo": {
+            "additionalProperties": false,
+            "properties": {
+              "applies_to": {
+                "title": "Applies To",
+                "type": "string"
+              },
+              "basis": {
+                "title": "Basis",
+                "type": "string"
+              },
+              "calendar_coverage": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Calendar Coverage"
+              },
+              "enabled": {
+                "default": true,
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "evidence": {
+                "default": "modeled_delay",
+                "enum": [
+                  "verified_vintage",
+                  "official_schedule",
+                  "modeled_delay",
+                  "ingestion_bound",
+                  "hindsight"
+                ],
+                "title": "Evidence",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "estimated_policy",
+                  "source_vintage",
+                  "ingestion_upper_bound",
+                  "ex_post"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Note"
+              },
+              "parameters": {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ]
+                },
+                "title": "Parameters",
+                "type": "object"
+              },
+              "policy_id": {
+                "title": "Policy Id",
+                "type": "string"
+              },
+              "sources": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Sources",
+                "type": "array"
+              },
+              "verified": {
+                "title": "Verified",
+                "type": "boolean"
+              },
+              "version": {
+                "title": "Version",
+                "type": "string"
+              }
+            },
+            "required": [
+              "policy_id",
+              "version",
+              "applies_to",
+              "kind",
+              "verified",
+              "basis",
+              "parameters"
+            ],
+            "title": "PolicyInfo",
+            "type": "object"
+          },
+          "RowAvailability": {
+            "additionalProperties": false,
+            "description": "How a value's availability was determined. Never overwrites stored timestamps.",
+            "properties": {
+              "available_at": {
+                "format": "date-time",
+                "title": "Available At",
+                "type": "string"
+              },
+              "capped_by_ingestion": {
+                "default": false,
+                "title": "Capped By Ingestion",
+                "type": "boolean"
+              },
+              "evidence": {
+                "default": "modeled_delay",
+                "enum": [
+                  "verified_vintage",
+                  "official_schedule",
+                  "modeled_delay",
+                  "ingestion_bound",
+                  "hindsight"
+                ],
+                "title": "Evidence",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "estimated_policy",
+                  "source_vintage",
+                  "ingestion_upper_bound",
+                  "ex_post"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "mode": {
+                "enum": [
+                  "strict",
+                  "estimated",
+                  "ex_post"
+                ],
+                "title": "Mode",
+                "type": "string"
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Note"
+              },
+              "policy_id": {
+                "title": "Policy Id",
+                "type": "string"
+              },
+              "policy_version": {
+                "title": "Policy Version",
+                "type": "string"
+              },
+              "precision": {
+                "enum": [
+                  "timestamp",
+                  "date"
+                ],
+                "title": "Precision",
+                "type": "string"
+              },
+              "strict_known_since": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Strict Known Since"
+              },
+              "verified": {
+                "title": "Verified",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "mode",
+              "policy_id",
+              "policy_version",
+              "kind",
+              "verified",
+              "available_at",
+              "precision"
+            ],
+            "title": "RowAvailability",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/DerivedResult"
+          },
+          "interface_version": {
+            "title": "Interface Version",
+            "type": "string"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "stram_data_version": {
+            "title": "Stram Data Version",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tool_version",
+          "stram_data_version",
+          "interface_version",
+          "policy_version",
+          "request_id",
+          "data"
+        ],
+        "title": "ToolEnvelope[DerivedResult]",
+        "type": "object"
+      },
+      "schemaHash": "5c909e7ae41d48a62640119302051e1d7716b1f3635cb7d5a7e197d0c1cd510b",
+      "scope": "quant:read"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Resolve source observations behind one derived event identifier.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_id"
+        ],
+        "title": "LineageInput",
+        "type": "object"
+      },
+      "name": "quant_get_lineage",
+      "outputSchema": {
+        "$defs": {
+          "DerivedRow": {
+            "additionalProperties": false,
+            "properties": {
+              "availability": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/RowAvailability"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "availability_basis": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Availability Basis"
+              },
+              "computed_at": {
+                "format": "date-time",
+                "title": "Computed At",
+                "type": "string"
+              },
+              "event_id": {
+                "title": "Event Id",
+                "type": "string"
+              },
+              "formula": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Formula"
+              },
+              "indicator_id": {
+                "title": "Indicator Id",
+                "type": "string"
+              },
+              "indicator_version": {
+                "title": "Indicator Version",
+                "type": "string"
+              },
+              "input_batch_ids": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Input Batch Ids",
+                "type": "array"
+              },
+              "input_event_ids": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Input Event Ids",
+                "type": "array"
+              },
+              "known_since": {
+                "format": "date",
+                "title": "Known Since",
+                "type": "string"
+              },
+              "licensed_input": {
+                "title": "Licensed Input",
+                "type": "boolean"
+              },
+              "observation_date": {
+                "format": "date",
+                "title": "Observation Date",
+                "type": "string"
+              },
+              "retracted": {
+                "title": "Retracted",
+                "type": "boolean"
+              },
+              "subject": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Subject"
+              },
+              "unit": {
+                "title": "Unit",
+                "type": "string"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Value"
+              }
+            },
+            "required": [
+              "event_id",
+              "indicator_id",
+              "indicator_version",
+              "subject",
+              "observation_date",
+              "value",
+              "unit",
+              "known_since",
+              "computed_at",
+              "input_event_ids",
+              "input_batch_ids",
+              "availability_basis",
+              "formula",
+              "licensed_input",
+              "retracted"
+            ],
+            "title": "DerivedRow",
+            "type": "object"
+          },
+          "LineageInput": {
+            "additionalProperties": false,
+            "properties": {
+              "dataset": {
+                "title": "Dataset",
+                "type": "string"
+              },
+              "event_id": {
+                "title": "Event Id",
+                "type": "string"
+              },
+              "known_since": {
+                "format": "date",
+                "title": "Known Since",
+                "type": "string"
+              },
+              "observed_on": {
+                "format": "date",
+                "title": "Observed On",
+                "type": "string"
+              },
+              "provider": {
+                "title": "Provider",
+                "type": "string"
+              },
+              "series_key": {
+                "title": "Series Key",
+                "type": "string"
+              },
+              "unit": {
+                "title": "Unit",
+                "type": "string"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Value"
+              }
+            },
+            "required": [
+              "dataset",
+              "event_id",
+              "provider",
+              "series_key",
+              "observed_on",
+              "value",
+              "unit",
+              "known_since"
+            ],
+            "title": "LineageInput",
+            "type": "object"
+          },
+          "LineageResult": {
+            "additionalProperties": false,
+            "properties": {
+              "availability_note": {
+                "title": "Availability Note",
+                "type": "string"
+              },
+              "event": {
+                "$ref": "#/$defs/DerivedRow"
+              },
+              "inputs": {
+                "items": {
+                  "$ref": "#/$defs/LineageInput"
+                },
+                "title": "Inputs",
+                "type": "array"
+              },
+              "unresolved_input_ids": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Unresolved Input Ids",
+                "type": "array"
+              }
+            },
+            "required": [
+              "event",
+              "inputs",
+              "availability_note"
+            ],
+            "title": "LineageResult",
+            "type": "object"
+          },
+          "RowAvailability": {
+            "additionalProperties": false,
+            "description": "How a value's availability was determined. Never overwrites stored timestamps.",
+            "properties": {
+              "available_at": {
+                "format": "date-time",
+                "title": "Available At",
+                "type": "string"
+              },
+              "capped_by_ingestion": {
+                "default": false,
+                "title": "Capped By Ingestion",
+                "type": "boolean"
+              },
+              "evidence": {
+                "default": "modeled_delay",
+                "enum": [
+                  "verified_vintage",
+                  "official_schedule",
+                  "modeled_delay",
+                  "ingestion_bound",
+                  "hindsight"
+                ],
+                "title": "Evidence",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "estimated_policy",
+                  "source_vintage",
+                  "ingestion_upper_bound",
+                  "ex_post"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "mode": {
+                "enum": [
+                  "strict",
+                  "estimated",
+                  "ex_post"
+                ],
+                "title": "Mode",
+                "type": "string"
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Note"
+              },
+              "policy_id": {
+                "title": "Policy Id",
+                "type": "string"
+              },
+              "policy_version": {
+                "title": "Policy Version",
+                "type": "string"
+              },
+              "precision": {
+                "enum": [
+                  "timestamp",
+                  "date"
+                ],
+                "title": "Precision",
+                "type": "string"
+              },
+              "strict_known_since": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Strict Known Since"
+              },
+              "verified": {
+                "title": "Verified",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "mode",
+              "policy_id",
+              "policy_version",
+              "kind",
+              "verified",
+              "available_at",
+              "precision"
+            ],
+            "title": "RowAvailability",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/LineageResult"
+          },
+          "interface_version": {
+            "title": "Interface Version",
+            "type": "string"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "stram_data_version": {
+            "title": "Stram Data Version",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tool_version",
+          "stram_data_version",
+          "interface_version",
+          "policy_version",
+          "request_id",
+          "data"
+        ],
+        "title": "ToolEnvelope[LineageResult]",
+        "type": "object"
+      },
+      "schemaHash": "881d7c1cf7dd9f0eb31cc96501fcaffcae5b7d3760515ba5f2376aca5c68e3ed",
+      "scope": "quant:lineage"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Align bounded quantitative series on an explicit calendar with bounded gap handling.",
+      "inputSchema": {
+        "$defs": {
+          "PanelColumnInput": {
+            "additionalProperties": false,
+            "properties": {
+              "indicator_id": {
+                "anyOf": [
+                  {
+                    "maxLength": 100,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9_.:\\-^=/ ]+$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Indicator Id"
+              },
+              "name": {
+                "maxLength": 40,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_]+$",
+                "title": "Name",
+                "type": "string"
+              },
+              "series_key": {
+                "maxLength": 100,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:\\-^=/ ]+$",
+                "title": "Series Key",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "series_key"
+            ],
+            "title": "PanelColumnInput",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "As Of"
+          },
+          "availability": {
+            "default": "strict",
+            "enum": [
+              "strict",
+              "estimated",
+              "ex_post"
+            ],
+            "title": "Availability",
+            "type": "string"
+          },
+          "calendar": {
+            "default": "union",
+            "enum": [
+              "union",
+              "intersection",
+              "first_column"
+            ],
+            "title": "Calendar",
+            "type": "string"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/$defs/PanelColumnInput"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Columns",
+            "type": "array"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "fill": {
+            "default": "none",
+            "enum": [
+              "none",
+              "forward"
+            ],
+            "title": "Fill",
+            "type": "string"
+          },
+          "limit": {
+            "default": 100,
+            "maximum": 500,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "max_staleness_days": {
+            "default": 0,
+            "maximum": 366,
+            "minimum": 0,
+            "title": "Max Staleness Days",
+            "type": "integer"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_date",
+          "end_date",
+          "columns"
+        ],
+        "title": "PanelInput",
+        "type": "object"
+      },
+      "name": "quant_get_aligned_panel",
+      "outputSchema": {
+        "$defs": {
+          "AvailabilitySummary": {
+            "additionalProperties": false,
+            "properties": {
+              "hindsight_only": {
+                "default": false,
+                "title": "Hindsight Only",
+                "type": "boolean"
+              },
+              "mode": {
+                "default": "strict",
+                "enum": [
+                  "strict",
+                  "estimated",
+                  "ex_post"
+                ],
+                "title": "Mode",
+                "type": "string"
+              },
+              "policies": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PolicyInfo"
+                },
+                "title": "Policies",
+                "type": "array"
+              },
+              "unavailable_rows": {
+                "default": 0,
+                "title": "Unavailable Rows",
+                "type": "integer"
+              },
+              "uncovered": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Uncovered",
+                "type": "array"
+              },
+              "warnings": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Warnings",
+                "type": "array"
+              }
+            },
+            "title": "AvailabilitySummary",
+            "type": "object"
+          },
+          "PanelCell": {
+            "additionalProperties": false,
+            "properties": {
+              "availability": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/RowAvailability"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "filled": {
+                "title": "Filled",
+                "type": "boolean"
+              },
+              "known_since": {
+                "format": "date",
+                "title": "Known Since",
+                "type": "string"
+              },
+              "observed_on": {
+                "format": "date",
+                "title": "Observed On",
+                "type": "string"
+              },
+              "stale_days": {
+                "title": "Stale Days",
+                "type": "integer"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Value"
+              }
+            },
+            "required": [
+              "value",
+              "observed_on",
+              "known_since",
+              "filled",
+              "stale_days"
+            ],
+            "title": "PanelCell",
+            "type": "object"
+          },
+          "PanelResult": {
+            "additionalProperties": false,
+            "properties": {
+              "as_of": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "As Of"
+              },
+              "availability": {
+                "$ref": "#/$defs/AvailabilitySummary"
+              },
+              "availability_note": {
+                "title": "Availability Note",
+                "type": "string"
+              },
+              "calendar": {
+                "title": "Calendar",
+                "type": "string"
+              },
+              "columns": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Columns",
+                "type": "array"
+              },
+              "count": {
+                "title": "Count",
+                "type": "integer"
+              },
+              "fill": {
+                "title": "Fill",
+                "type": "string"
+              },
+              "limit": {
+                "title": "Limit",
+                "type": "integer"
+              },
+              "rows": {
+                "items": {
+                  "$ref": "#/$defs/PanelRow"
+                },
+                "title": "Rows",
+                "type": "array"
+              },
+              "truncated": {
+                "title": "Truncated",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "columns",
+              "rows",
+              "count",
+              "limit",
+              "truncated",
+              "as_of",
+              "calendar",
+              "fill",
+              "availability_note"
+            ],
+            "title": "PanelResult",
+            "type": "object"
+          },
+          "PanelRow": {
+            "additionalProperties": false,
+            "properties": {
+              "cells": {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/PanelCell"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "title": "Cells",
+                "type": "object"
+              },
+              "observed_on": {
+                "format": "date",
+                "title": "Observed On",
+                "type": "string"
+              }
+            },
+            "required": [
+              "observed_on",
+              "cells"
+            ],
+            "title": "PanelRow",
+            "type": "object"
+          },
+          "PolicyInfo": {
+            "additionalProperties": false,
+            "properties": {
+              "applies_to": {
+                "title": "Applies To",
+                "type": "string"
+              },
+              "basis": {
+                "title": "Basis",
+                "type": "string"
+              },
+              "calendar_coverage": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Calendar Coverage"
+              },
+              "enabled": {
+                "default": true,
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "evidence": {
+                "default": "modeled_delay",
+                "enum": [
+                  "verified_vintage",
+                  "official_schedule",
+                  "modeled_delay",
+                  "ingestion_bound",
+                  "hindsight"
+                ],
+                "title": "Evidence",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "estimated_policy",
+                  "source_vintage",
+                  "ingestion_upper_bound",
+                  "ex_post"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Note"
+              },
+              "parameters": {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ]
+                },
+                "title": "Parameters",
+                "type": "object"
+              },
+              "policy_id": {
+                "title": "Policy Id",
+                "type": "string"
+              },
+              "sources": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Sources",
+                "type": "array"
+              },
+              "verified": {
+                "title": "Verified",
+                "type": "boolean"
+              },
+              "version": {
+                "title": "Version",
+                "type": "string"
+              }
+            },
+            "required": [
+              "policy_id",
+              "version",
+              "applies_to",
+              "kind",
+              "verified",
+              "basis",
+              "parameters"
+            ],
+            "title": "PolicyInfo",
+            "type": "object"
+          },
+          "RowAvailability": {
+            "additionalProperties": false,
+            "description": "How a value's availability was determined. Never overwrites stored timestamps.",
+            "properties": {
+              "available_at": {
+                "format": "date-time",
+                "title": "Available At",
+                "type": "string"
+              },
+              "capped_by_ingestion": {
+                "default": false,
+                "title": "Capped By Ingestion",
+                "type": "boolean"
+              },
+              "evidence": {
+                "default": "modeled_delay",
+                "enum": [
+                  "verified_vintage",
+                  "official_schedule",
+                  "modeled_delay",
+                  "ingestion_bound",
+                  "hindsight"
+                ],
+                "title": "Evidence",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "estimated_policy",
+                  "source_vintage",
+                  "ingestion_upper_bound",
+                  "ex_post"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "mode": {
+                "enum": [
+                  "strict",
+                  "estimated",
+                  "ex_post"
+                ],
+                "title": "Mode",
+                "type": "string"
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Note"
+              },
+              "policy_id": {
+                "title": "Policy Id",
+                "type": "string"
+              },
+              "policy_version": {
+                "title": "Policy Version",
+                "type": "string"
+              },
+              "precision": {
+                "enum": [
+                  "timestamp",
+                  "date"
+                ],
+                "title": "Precision",
+                "type": "string"
+              },
+              "strict_known_since": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Strict Known Since"
+              },
+              "verified": {
+                "title": "Verified",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "mode",
+              "policy_id",
+              "policy_version",
+              "kind",
+              "verified",
+              "available_at",
+              "precision"
+            ],
+            "title": "RowAvailability",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/PanelResult"
+          },
+          "interface_version": {
+            "title": "Interface Version",
+            "type": "string"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "stram_data_version": {
+            "title": "Stram Data Version",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tool_version",
+          "stram_data_version",
+          "interface_version",
+          "policy_version",
+          "request_id",
+          "data"
+        ],
+        "title": "ToolEnvelope[PanelResult]",
+        "type": "object"
+      },
+      "schemaHash": "1bf03035bec3f7ebf5ad01b4d62e5721f932d10d04b9e70a97b06644d368bf6a",
+      "scope": "quant:analytics"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Compute bounded forward returns after conditions became known, with a baseline.",
+      "inputSchema": {
+        "$defs": {
+          "ConditionInput": {
+            "additionalProperties": false,
+            "properties": {
+              "indicator_id": {
+                "anyOf": [
+                  {
+                    "maxLength": 100,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9_.:\\-^=/ ]+$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Indicator Id"
+              },
+              "operator": {
+                "enum": [
+                  "gt",
+                  "ge",
+                  "lt",
+                  "le",
+                  "rising",
+                  "falling"
+                ],
+                "title": "Operator",
+                "type": "string"
+              },
+              "series_key": {
+                "maxLength": 100,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:\\-^=/ ]+$",
+                "title": "Series Key",
+                "type": "string"
+              },
+              "threshold": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Threshold"
+              }
+            },
+            "required": [
+              "series_key",
+              "operator"
+            ],
+            "title": "ConditionInput",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "As Of"
+          },
+          "availability": {
+            "default": "strict",
+            "enum": [
+              "strict",
+              "estimated",
+              "ex_post"
+            ],
+            "title": "Availability",
+            "type": "string"
+          },
+          "conditions": {
+            "items": {
+              "$ref": "#/$defs/ConditionInput"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Conditions",
+            "type": "array"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "entry": {
+            "default": "next_close",
+            "enum": [
+              "next_close",
+              "same_close"
+            ],
+            "title": "Entry",
+            "type": "string"
+          },
+          "horizons": {
+            "default": [
+              1,
+              5,
+              20
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Horizons",
+            "type": "array"
+          },
+          "limit": {
+            "default": 100,
+            "maximum": 200,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "target_symbol": {
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:\\-^=/ ]+$",
+            "title": "Target Symbol",
+            "type": "string"
+          },
+          "trigger": {
+            "default": "onset",
+            "enum": [
+              "onset",
+              "while"
+            ],
+            "title": "Trigger",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_date",
+          "end_date",
+          "target_symbol",
+          "conditions"
+        ],
+        "title": "ConditionalReturnsInput",
+        "type": "object"
+      },
+      "name": "quant_get_conditional_returns",
+      "outputSchema": {
+        "$defs": {
+          "AvailabilitySummary": {
+            "additionalProperties": false,
+            "properties": {
+              "hindsight_only": {
+                "default": false,
+                "title": "Hindsight Only",
+                "type": "boolean"
+              },
+              "mode": {
+                "default": "strict",
+                "enum": [
+                  "strict",
+                  "estimated",
+                  "ex_post"
+                ],
+                "title": "Mode",
+                "type": "string"
+              },
+              "policies": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PolicyInfo"
+                },
+                "title": "Policies",
+                "type": "array"
+              },
+              "unavailable_rows": {
+                "default": 0,
+                "title": "Unavailable Rows",
+                "type": "integer"
+              },
+              "uncovered": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Uncovered",
+                "type": "array"
+              },
+              "warnings": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Warnings",
+                "type": "array"
+              }
+            },
+            "title": "AvailabilitySummary",
+            "type": "object"
+          },
+          "ConditionValue": {
+            "additionalProperties": false,
+            "properties": {
+              "availability": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/RowAvailability"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "indicator_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Indicator Id"
+              },
+              "known_since": {
+                "format": "date",
+                "title": "Known Since",
+                "type": "string"
+              },
+              "observed_on": {
+                "format": "date",
+                "title": "Observed On",
+                "type": "string"
+              },
+              "previous_observed_on": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Previous Observed On"
+              },
+              "previous_value": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Previous Value"
+              },
+              "series_key": {
+                "title": "Series Key",
+                "type": "string"
+              },
+              "source_event_id": {
+                "title": "Source Event Id",
+                "type": "string"
+              },
+              "value": {
+                "title": "Value",
+                "type": "number"
+              }
+            },
+            "required": [
+              "series_key",
+              "indicator_id",
+              "observed_on",
+              "value",
+              "known_since",
+              "source_event_id",
+              "previous_observed_on",
+              "previous_value"
+            ],
+            "title": "ConditionValue",
+            "type": "object"
+          },
+          "ConditionalEvent": {
+            "additionalProperties": false,
+            "description": "One event: the entry signal (what was available) and, separately, the outcomes.\n\nIn estimated and ex_post modes `signal_cutoff_at` is the moment the signal was\nevaluated, `signal_available_at` the instant the information behind it became available\n(never later than the cutoff), and `entry_at` the entry price time (never earlier than\nthe cutoff). `forward_returns` are future outcomes measured after `entry_at`.",
+            "properties": {
+              "conditions": {
+                "items": {
+                  "$ref": "#/$defs/ConditionValue"
+                },
+                "title": "Conditions",
+                "type": "array"
+              },
+              "entry_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Entry At"
+              },
+              "entry_close": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Entry Close"
+              },
+              "entry_date": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Entry Date"
+              },
+              "event_date": {
+                "format": "date",
+                "title": "Event Date",
+                "type": "string"
+              },
+              "forward_returns": {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "title": "Forward Returns",
+                "type": "object"
+              },
+              "signal_available_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Signal Available At"
+              },
+              "signal_cutoff_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Signal Cutoff At"
+              }
+            },
+            "required": [
+              "event_date",
+              "entry_date",
+              "entry_close",
+              "forward_returns",
+              "conditions"
+            ],
+            "title": "ConditionalEvent",
+            "type": "object"
+          },
+          "ConditionalReturnsResult": {
+            "additionalProperties": false,
+            "properties": {
+              "as_of": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "As Of"
+              },
+              "availability": {
+                "$ref": "#/$defs/AvailabilitySummary"
+              },
+              "availability_note": {
+                "title": "Availability Note",
+                "type": "string"
+              },
+              "baseline": {
+                "items": {
+                  "$ref": "#/$defs/HorizonSummary"
+                },
+                "title": "Baseline",
+                "type": "array"
+              },
+              "entry": {
+                "title": "Entry",
+                "type": "string"
+              },
+              "evaluated_days": {
+                "title": "Evaluated Days",
+                "type": "integer"
+              },
+              "event_count": {
+                "title": "Event Count",
+                "type": "integer"
+              },
+              "events": {
+                "items": {
+                  "$ref": "#/$defs/ConditionalEvent"
+                },
+                "title": "Events",
+                "type": "array"
+              },
+              "horizons": {
+                "items": {
+                  "type": "integer"
+                },
+                "title": "Horizons",
+                "type": "array"
+              },
+              "notes": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Notes",
+                "type": "array"
+              },
+              "state_days": {
+                "title": "State Days",
+                "type": "integer"
+              },
+              "summary": {
+                "items": {
+                  "$ref": "#/$defs/HorizonSummary"
+                },
+                "title": "Summary",
+                "type": "array"
+              },
+              "target_symbol": {
+                "title": "Target Symbol",
+                "type": "string"
+              },
+              "trigger": {
+                "title": "Trigger",
+                "type": "string"
+              },
+              "truncated": {
+                "title": "Truncated",
+                "type": "boolean"
+              },
+              "undetermined_days": {
+                "title": "Undetermined Days",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "target_symbol",
+              "horizons",
+              "trigger",
+              "entry",
+              "as_of",
+              "evaluated_days",
+              "undetermined_days",
+              "state_days",
+              "event_count",
+              "events",
+              "truncated",
+              "summary",
+              "baseline",
+              "notes",
+              "availability_note"
+            ],
+            "title": "ConditionalReturnsResult",
+            "type": "object"
+          },
+          "HorizonSummary": {
+            "additionalProperties": false,
+            "properties": {
+              "hit_rate": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Hit Rate"
+              },
+              "horizon": {
+                "title": "Horizon",
+                "type": "integer"
+              },
+              "maximum": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Maximum"
+              },
+              "mean": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Mean"
+              },
+              "median": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Median"
+              },
+              "minimum": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Minimum"
+              },
+              "observations": {
+                "title": "Observations",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "horizon",
+              "observations",
+              "mean",
+              "median",
+              "hit_rate",
+              "minimum",
+              "maximum"
+            ],
+            "title": "HorizonSummary",
+            "type": "object"
+          },
+          "PolicyInfo": {
+            "additionalProperties": false,
+            "properties": {
+              "applies_to": {
+                "title": "Applies To",
+                "type": "string"
+              },
+              "basis": {
+                "title": "Basis",
+                "type": "string"
+              },
+              "calendar_coverage": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Calendar Coverage"
+              },
+              "enabled": {
+                "default": true,
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "evidence": {
+                "default": "modeled_delay",
+                "enum": [
+                  "verified_vintage",
+                  "official_schedule",
+                  "modeled_delay",
+                  "ingestion_bound",
+                  "hindsight"
+                ],
+                "title": "Evidence",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "estimated_policy",
+                  "source_vintage",
+                  "ingestion_upper_bound",
+                  "ex_post"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Note"
+              },
+              "parameters": {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ]
+                },
+                "title": "Parameters",
+                "type": "object"
+              },
+              "policy_id": {
+                "title": "Policy Id",
+                "type": "string"
+              },
+              "sources": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Sources",
+                "type": "array"
+              },
+              "verified": {
+                "title": "Verified",
+                "type": "boolean"
+              },
+              "version": {
+                "title": "Version",
+                "type": "string"
+              }
+            },
+            "required": [
+              "policy_id",
+              "version",
+              "applies_to",
+              "kind",
+              "verified",
+              "basis",
+              "parameters"
+            ],
+            "title": "PolicyInfo",
+            "type": "object"
+          },
+          "RowAvailability": {
+            "additionalProperties": false,
+            "description": "How a value's availability was determined. Never overwrites stored timestamps.",
+            "properties": {
+              "available_at": {
+                "format": "date-time",
+                "title": "Available At",
+                "type": "string"
+              },
+              "capped_by_ingestion": {
+                "default": false,
+                "title": "Capped By Ingestion",
+                "type": "boolean"
+              },
+              "evidence": {
+                "default": "modeled_delay",
+                "enum": [
+                  "verified_vintage",
+                  "official_schedule",
+                  "modeled_delay",
+                  "ingestion_bound",
+                  "hindsight"
+                ],
+                "title": "Evidence",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "estimated_policy",
+                  "source_vintage",
+                  "ingestion_upper_bound",
+                  "ex_post"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "mode": {
+                "enum": [
+                  "strict",
+                  "estimated",
+                  "ex_post"
+                ],
+                "title": "Mode",
+                "type": "string"
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Note"
+              },
+              "policy_id": {
+                "title": "Policy Id",
+                "type": "string"
+              },
+              "policy_version": {
+                "title": "Policy Version",
+                "type": "string"
+              },
+              "precision": {
+                "enum": [
+                  "timestamp",
+                  "date"
+                ],
+                "title": "Precision",
+                "type": "string"
+              },
+              "strict_known_since": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Strict Known Since"
+              },
+              "verified": {
+                "title": "Verified",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "mode",
+              "policy_id",
+              "policy_version",
+              "kind",
+              "verified",
+              "available_at",
+              "precision"
+            ],
+            "title": "RowAvailability",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/ConditionalReturnsResult"
+          },
+          "interface_version": {
+            "title": "Interface Version",
+            "type": "string"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "stram_data_version": {
+            "title": "Stram Data Version",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tool_version",
+          "stram_data_version",
+          "interface_version",
+          "policy_version",
+          "request_id",
+          "data"
+        ],
+        "title": "ToolEnvelope[ConditionalReturnsResult]",
+        "type": "object"
+      },
+      "schemaHash": "697e6908b3be4fe65ad65782991423f24e18ca50c8f044540d7c68193fc72a93",
+      "scope": "quant:analytics"
+    }
+  ]
+}

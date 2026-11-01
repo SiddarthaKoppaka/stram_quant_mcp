@@ -1,0 +1,78 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "stram-quant-mcp"
+version = "0.1.0"
+description = "Read-only MCP Tool Plane for Stram quantitative data"
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+license = { text = "Proprietary" }
+dependencies = [
+  "mcp==2.3.0",
+  "opentelemetry-exporter-otlp-proto-http>=1.45,<2",
+  "opentelemetry-sdk>=1.45,<2",
+  "pydantic>=2.10,<3",
+  "PyJWT[crypto]>=2.10,<3",
+  "stram-data @ git+https://github.com/SiddarthaKoppaka/stram_data@890b44911b56d0f165cfa7962032d00292b4e10e",
+]
+
+[project.scripts]
+stram-quant-mcp = "stram_quant_mcp.app:main"
+
+[dependency-groups]
+dev = [
+  "cyclonedx-bom>=7,<8",
+  "detect-secrets>=1.5,<2",
+  "mypy>=1.13,<2",
+  "pip-audit>=2.9,<3",
+  "pip-licenses>=5,<6",
+  "pytest>=8.3,<10",
+  "pytest-asyncio>=0.25,<2",
+  "pytest-cov>=6,<8",
+  "ruff>=0.8,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/stram_quant_mcp"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.pytest.ini_options]
+addopts = "-q --strict-markers --strict-config"
+testpaths = ["tests"]
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+  "container: requires a local container runtime",
+  "integration: crosses a process or protocol boundary",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["stram_quant_mcp"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "ASYNC", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["stram_quant_mcp"]
+
+[[tool.mypy.overrides]]
+module = ["pyarrow", "pyarrow.*", "duckdb"]
+ignore_missing_imports = true

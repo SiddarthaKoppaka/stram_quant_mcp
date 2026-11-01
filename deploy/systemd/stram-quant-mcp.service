@@ -1,0 +1,25 @@
+[Unit]
+Description=Stram Quant MCP private read-only tool plane
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/stram-quant-mcp/runtime.env
+ExecStartPre=/usr/bin/docker run --rm --read-only --network none --cap-drop ALL --security-opt no-new-privileges --user 10001:10001 --mount type=bind,src=${STRAM_MCP_LAKE_PATH},dst=/lake,readonly --tmpfs /tmp:rw,noexec,nosuid,size=64m ${STRAM_MCP_IMAGE}@${STRAM_MCP_IMAGE_DIGEST} preflight
+ExecStartPre=-/usr/bin/docker rm -f stram-quant-mcp
+ExecStart=/usr/bin/docker run --rm --name stram-quant-mcp --read-only --cap-drop ALL --security-opt no-new-privileges --pids-limit 128 --memory 1536m --cpus 2 --user 10001:10001 --network ${STRAM_MCP_NETWORK} --publish 127.0.0.1:${STRAM_MCP_HOST_PORT}:8000 --mount type=bind,src=${STRAM_MCP_LAKE_PATH},dst=/lake,readonly --mount type=bind,src=${STRAM_MCP_AUDIT_PATH},dst=/audit --mount type=bind,src=${STRAM_MCP_AUDIT_KEY_PATH},dst=/run/secrets/audit-key,readonly --tmpfs /tmp:rw,noexec,nosuid,size=64m --env-file %h/.config/stram-quant-mcp/service.env ${STRAM_MCP_IMAGE}@${STRAM_MCP_IMAGE_DIGEST} serve
+ExecStop=/usr/bin/docker stop --time 15 stram-quant-mcp
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=90s
+TimeoutStopSec=20s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+LockPersonality=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=default.target

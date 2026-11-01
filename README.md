@@ -1,0 +1,78 @@
+# Stram Quant MCP
+
+Stram Quant MCP is the independently deployed, read-only MCP Tool Plane for Stram quantitative
+data. Ten typed tools expose the pinned `stram_data.data_interface` 1.3.1 API over authenticated
+Streamable HTTP. This repository owns transport, identity, authorization, bounds, worker isolation,
+audit and telemetry. It does not own SQL, financial calculations, ingestion, lake schemas or AI
+orchestration.
+
+Status on 2026-10-31: M0-M5 are locally implemented and independently reviewed. Local tests and
+synthetic-lake integration pass. M6 SIDDU staging is **not deployed or production-verified** and still
+requires separate authorization and production decisions recorded in [PLANS.md](PLANS.md).
+
+## Architecture in five minutes
+
+```mermaid
+flowchart LR
+    C[MCP client] -->|HTTPS + bearer JWT| T[Streamable HTTP]
+    T --> A[JWT authentication]
+    A --> P[tenant, scope, rate and bounds]
+    P --> J[(HMAC-chained audit)]
+    P --> W[isolated query worker]
+    W --> I[stram_data.data_interface 1.3.1]
+    I --> D[DuckDB over read-only Parquet]
+    W -. no token, socket APIs blocked .-> I
+```
+
+Every call is authenticated and authorized before worker dispatch. The worker receives only a tool
+name, validated arguments and a request ID. It imports only the public Data Interface. Terminal
+success, denial and failure outcomes are appended to the audit chain; an audit append failure fails
+the call closed. See [Architecture](docs/ARCHITECTURE.md) for the complete lifecycle and boundaries.
+
+## Quick start
+
+Supported toolchain: CPython 3.12 through 3.14 and `uv`. The lock pins the exact `stram-data` source
+commit for release 1.3.1. Private repository access is needed only when the dependency is not already
+available in the local cache.
+
+```bash
+uv sync --frozen --dev
+uv run python -c 'import stram_data; assert stram_data.__version__ == "1.3.1"'
+uv run pytest tests/integration/test_mcp_client.py -q
+```
+
+The integration test starts the real server on loopback, signs a short-lived JWT, connects with the
+official MCP SDK client, discovers all ten tools and calls the real Data Interface against
+`tests/fixtures/lake`. It does not use production credentials or mocked quantitative responses.
+
+Run the complete local gate:
+
+```bash
+uv run pytest --cov --cov-report=term-missing
+uv run mypy
+uv run ruff check .
+uv run ruff format --check .
+uv run python -m stram_quant_mcp.tools.export_schema --check
+uv run python tools/check_docs.py
+```
+
+Container startup is stricter than local tests: the `serve` entrypoint runs preflight and refuses root
+execution, a writable root filesystem, a writable lake, or dependency/interface drift.
+
+## Documentation
+
+Use the entry point that matches the job:
+
+| Need | Document |
+|---|---|
+| Understand boundaries and failure behavior | [Architecture](docs/ARCHITECTURE.md) |
+| Install, test and connect a client | [Onboarding](docs/ONBOARDING.md) |
+| Look up tool schemas, scopes and errors | [Tool reference](docs/TOOLS.md) |
+| Build, stage, monitor, recover or roll back | [Operations](docs/OPERATIONS.md) |
+| Review SIDDU prerequisites and templates | [Deployment](deploy/README.md) |
+| See milestone evidence and unresolved decisions | [Plans](PLANS.md) |
+| Apply normative engineering rules | [Engineering standards](ENGINEERING.md) |
+| Review the PyArrow exception | [Security exceptions](docs/SECURITY_EXCEPTIONS.md) |
+| Read release-candidate notes | [Changelog](CHANGELOG.md) |
+
+Do not deploy, access production secrets, change SIDDU, tag or push without separate authorization.
