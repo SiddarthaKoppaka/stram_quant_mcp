@@ -203,6 +203,31 @@ class AuditJournal:
                 self._healthy = False
                 raise AuditWriteError("audit writer probe failed") from error
 
+    def backup(self, destination: Path) -> AuditVerification:
+        """Create a new WAL-consistent SQLite backup and verify it independently."""
+
+        if destination.exists():
+            raise ValueError("audit backup destination already exists")
+        if not destination.parent.is_dir():
+            raise ValueError("audit backup directory must already exist")
+        with self._lock:
+            try:
+                backup = sqlite3.connect(destination)
+                try:
+                    self._connection.backup(backup)
+                finally:
+                    backup.close()
+                destination.chmod(0o600)
+            except (sqlite3.Error, OSError) as error:
+                with contextlib.suppress(OSError):
+                    destination.unlink()
+                raise AuditWriteError("audit online backup failed") from error
+        independent = AuditJournal(destination, self._key, clock=self._clock)
+        try:
+            return independent.verify()
+        finally:
+            independent.close()
+
     def close(self) -> None:
         with self._lock:
             self._connection.close()
@@ -226,15 +251,21 @@ def main() -> None:
             else None
         ),
     )
+    backup = subcommands.add_parser("backup")
+    backup.add_argument("--db", type=Path, required=True)
+    backup.add_argument("--key-file", type=Path, required=True)
+    backup.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    if args.command == "verify":
-        if not args.key_file:
-            raise SystemExit("audit key file is required")
-        journal = AuditJournal(args.db, load_secret_file(args.key_file))
-        try:
+    if not args.key_file:
+        raise SystemExit("audit key file is required")
+    journal = AuditJournal(args.db, load_secret_file(args.key_file))
+    try:
+        if args.command == "verify":
             sys.stdout.write(journal.verify().model_dump_json() + "\n")
-        finally:
-            journal.close()
+        elif args.command == "backup":
+            sys.stdout.write(journal.backup(args.output).model_dump_json() + "\n")
+    finally:
+        journal.close()
 
 
 if __name__ == "__main__":

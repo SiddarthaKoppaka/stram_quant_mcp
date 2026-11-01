@@ -132,10 +132,12 @@ insufficient-scope tokens fail closed.
 
 ## Authorized SIDDU access
 
-**Not yet verified.** An approved M6 change must provide a dedicated rootless Podman service identity,
-read-only access to a Data Plane-owned lake view, an audit volume and separate HMAC key, a private
-proxy/network, non-production issuer client and immutable image digest. Operators must not reuse the
-pipeline's writable identity or change Data Plane ownership to make the MCP work.
+The `stram-quant` identity, read-only Data Plane-owned lake view, audit volume, separate HMAC key,
+review image and real-lake probes are verified in the 2026-11-01 handoff and must be reused. The local
+Keycloak/PostgreSQL templates and consolidated installer are prepared but not installed or activated.
+Private DNS/TLS, host egress policy, `stram-auth` creation, immutable release digests and staging
+approvals remain **not verified**. Operators must not reuse the pipeline's writable identity, change
+Data Plane ownership, or mark approval flags without evidence.
 
 Before any staging action, complete [Deployment prerequisites](../deploy/README.md) and the M6
 checklist in [Operations](OPERATIONS.md#m6-staging-checklist). Record commands and results without

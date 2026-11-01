@@ -78,3 +78,24 @@ def test_writer_probe_commits_without_creating_an_audit_record_and_fails_closed(
     with pytest.raises(AuditWriteError):
         journal.probe_write()
     assert journal.healthy is False
+
+
+def test_online_backup_is_consistent_verified_and_never_overwritten(tmp_path) -> None:
+    source = tmp_path / "audit.sqlite3"
+    destination = tmp_path / "backup" / "audit.sqlite3"
+    destination.parent.mkdir()
+    journal = AuditJournal(source, b"k" * 32)
+    journal.append(_event())
+
+    verification = journal.backup(destination)
+    journal.close()
+
+    assert verification.records == 1
+    assert verification.last_sequence == 1
+    assert destination.stat().st_mode & 0o777 == 0o600
+    reopened = AuditJournal(source, b"k" * 32)
+    try:
+        with pytest.raises(ValueError, match="already exists"):
+            reopened.backup(destination)
+    finally:
+        reopened.close()

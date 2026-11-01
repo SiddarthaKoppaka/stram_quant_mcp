@@ -102,6 +102,17 @@ Tailscale, no Tailscale Serve/private TLS proxy and available host firewall tool
 changed. Exact source/image/schema hashes and final suite results are recorded in the handoff after the
 Git baseline is frozen.
 
+### M6 SIDDU local Keycloak staging preparation (2026-11-01)
+
+Prepared on branch `feat/m6-siddu-local-keycloak` over baseline `d19133350dfba394dac94f7e5615def4a366a3cc`:
+
+- Consolidated operator workflow in [`deploy/stram_quant_siddu.sh`](deploy/stram_quant_siddu.sh) preserving `prepare`, `activate` and `status` compatibility while adding `doctor`, `auth-prepare`, `auth-start`, `auth-verify`, `verify`, `backup-audit` and `rollback`.
+- Segregated `stram-auth` rootless Podman Quadlet design (`stram-keycloak-db.container` and `stram-keycloak.container`) on an `--internal` Podman network with digest-pinned PostgreSQL 17 and optimized Keycloak 26 (`start --optimized --import-realm`, no `start-dev`), Podman secret injection (`KCRAW_DB_PASSWORD`, client secrets, bootstrap password), and loopback-only publication (`127.0.0.1:9080` and `127.0.0.1:9001`).
+- Realm template [`deploy/keycloak/stram-staging-realm.json`](deploy/keycloak/stram-staging-realm.json) with `RS256`, 300s access tokens, confidential service-account clients (`stram-quant-smoke` and `stram-quant-discovery-only`), explicit audience mapper (`${STRAM_MCP_RESOURCE_URL}`), hardcoded `tenant_id` mapper (`${STRAM_MCP_TENANT_ID}`), and independent optional scopes (`quant:discover`, `quant:read`, `quant:lineage`, `quant:analytics`).
+- Online WAL-safe SQLite audit backup (`python -m stram_quant_mcp.audit backup`) with independent HMAC chain verification and host-signed external checkpointing in `backup-audit` and `rollback`.
+- Credential-safe staging acceptance runner [`tools/staging_acceptance.py`](tools/staging_acceptance.py) validating OIDC discovery/JWKS, positive token claims, negative JWT signatures/claims, Host (`421`) and Origin (`403`) denials, insufficient-scope tool denial, official MCP SDK session over HTTPS, worker seccomp filter count, and non-allowlisted DNS/IPv4/IPv6 egress denials.
+- No privileged host mutations, service activations, credential accesses, or lake modifications were executed; live activation remains gated on operator-approved private DNS/TLS routing, `stram-auth` user creation, host egress firewall rules, and immutable registry digests in `/etc/stram-quant/auth.env` and `/etc/stram-quant/m6-approval.env`.
+
 ## 1. Verified knowledge transfer
 
 ### Source and release baseline

@@ -70,6 +70,7 @@ Use the entry point that matches the job:
 | Look up tool schemas, scopes and errors | [Tool reference](docs/TOOLS.md) |
 | Build, stage, monitor, recover or roll back | [Operations](docs/OPERATIONS.md) |
 | Review SIDDU prerequisites and templates | [Deployment](deploy/README.md) |
+| Read the consolidated STRAM HQ M6 handoff | [STRAM HQ handoff](docs/STRAM_HQ_HANDOFF.md) |
 | See milestone evidence and unresolved decisions | [Plans](PLANS.md) |
 | Apply normative engineering rules | [Engineering standards](ENGINEERING.md) |
 | Review the PyArrow exception | [Security exceptions](docs/SECURITY_EXCEPTIONS.md) |

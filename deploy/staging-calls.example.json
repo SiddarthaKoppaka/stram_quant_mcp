@@ -1,0 +1,30 @@
+{
+  "calls": [
+    {
+      "class": "discovery",
+      "tool": "quant_list_series",
+      "arguments": {"limit": 1}
+    },
+    {
+      "class": "read",
+      "tool": "quant_get_freshness",
+      "arguments": {}
+    },
+    {
+      "class": "lineage",
+      "tool": "quant_get_lineage",
+      "arguments": {"event_id": "REPLACE_WITH_REAL_EVENT_ID"}
+    },
+    {
+      "class": "analytics",
+      "tool": "quant_get_aligned_panel",
+      "arguments": {
+        "series_keys": ["REPLACE_WITH_REAL_SERIES_KEY"],
+        "start": "2026-01-01",
+        "end": "2026-01-02",
+        "availability": "strict",
+        "limit": 10
+      }
+    }
+  ]
+}

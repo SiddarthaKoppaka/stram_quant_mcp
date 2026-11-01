@@ -1,0 +1,138 @@
+{
+  "realm": "${STRAM_KEYCLOAK_REALM}",
+  "enabled": true,
+  "displayName": "Stram private staging",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "registrationEmailAsUsername": false,
+  "rememberMe": false,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": false,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "accessTokenLifespanForImplicitFlow": 0,
+  "ssoSessionIdleTimeout": 900,
+  "ssoSessionMaxLifespan": 3600,
+  "offlineSessionMaxLifespanEnabled": true,
+  "offlineSessionMaxLifespan": 3600,
+  "defaultSignatureAlgorithm": "RS256",
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "clientScopes": [
+    {
+      "name": "stram-claims",
+      "description": "Exact Quant MCP audience and staging tenant",
+      "protocol": "openid-connect",
+      "attributes": {"include.in.token.scope": "false"},
+      "protocolMappers": [
+        {
+          "name": "stram-quant-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "${STRAM_MCP_RESOURCE_URL}",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "stram-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "tenant_id",
+            "claim.value": "${STRAM_MCP_TENANT_ID}",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "quant:discover",
+      "description": "Discover Quant MCP catalog and availability metadata",
+      "protocol": "openid-connect",
+      "attributes": {"include.in.token.scope": "true"}
+    },
+    {
+      "name": "quant:read",
+      "description": "Read bounded quantitative observations and derived data",
+      "protocol": "openid-connect",
+      "attributes": {"include.in.token.scope": "true"}
+    },
+    {
+      "name": "quant:lineage",
+      "description": "Read bounded quantitative lineage",
+      "protocol": "openid-connect",
+      "attributes": {"include.in.token.scope": "true"}
+    },
+    {
+      "name": "quant:analytics",
+      "description": "Run bounded read-only analytics",
+      "protocol": "openid-connect",
+      "attributes": {"include.in.token.scope": "true"}
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "stram-quant-smoke",
+      "name": "Stram Quant staging smoke client",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${STRAM_SMOKE_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "publicClient": false,
+      "frontchannelLogout": false,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": ["stram-claims"],
+      "optionalClientScopes": [
+        "quant:discover",
+        "quant:read",
+        "quant:lineage",
+        "quant:analytics"
+      ],
+      "attributes": {
+        "client.session.idle.timeout": "300",
+        "client.session.max.lifespan": "900",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "oidc.ciba.grant.enabled": "false",
+        "use.refresh.tokens": "false"
+      }
+    },
+    {
+      "clientId": "stram-quant-discovery-only",
+      "name": "Stram Quant staging insufficient-scope client",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${STRAM_DISCOVERY_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "publicClient": false,
+      "frontchannelLogout": false,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": ["stram-claims"],
+      "optionalClientScopes": ["quant:discover"],
+      "attributes": {
+        "client.session.idle.timeout": "300",
+        "client.session.max.lifespan": "900",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "oidc.ciba.grant.enabled": "false",
+        "use.refresh.tokens": "false"
+      }
+    }
+  ]
+}

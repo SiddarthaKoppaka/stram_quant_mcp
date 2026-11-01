@@ -1,9 +1,12 @@
 # Operations
 
-This runbook covers the V1 single-replica service. Local and synthetic-lake behavior is verified. A
-read-only SIDDU inventory was completed on 2026-10-31; no service, file, firewall or identity was
-changed. Deployment, the non-production identity provider, private TLS route, telemetry destination,
-audit retention and rollback are **not yet verified** and require an authorized M6 change.
+This runbook covers the V1 single-replica service. Local and synthetic-lake behavior is verified. By
+2026-11-01 the dedicated Quant identity, kernel-enforced read-only real-lake view, audit volume/HMAC
+secret, review image and real-lake worker probes had been verified. A consolidated Keycloak/Quadlet
+workflow is implemented in the repository but has not been installed or activated. The authentication
+identity, private DNS/TLS route, host firewall policy, immutable release digests, telemetry destination,
+audit retention approval and rollback drill remain **not verified** until an authorized M6 change
+records evidence.
 
 ## Build and release gates
 
@@ -87,12 +90,13 @@ token or exposes dependency details.
 
 ### Read-only inventory
 
-Verified on SIDDU on 2026-10-31 without mutation: Podman 6.1.4 is rootless with Netavark and cgroup v2;
-existing application containers are generated from user Quadlets; published application ports are
-loopback-only; Tailscale is active; no Tailscale Serve route or Caddy, Nginx or Traefik service is
-configured; and `nft` and `firewall-cmd` are installed. The canonical lake is on a read-write ext4
-filesystem and its parent is private to the existing Data Plane identity. There is no dedicated MCP
-identity, kernel-enforced read-only lake view, private TLS route or MCP network policy yet.
+The 2026-11-01 handoff records Podman 6.1.4 rootless with Netavark and cgroup v2, the dedicated
+`stram-quant` identity, `/srv/stram-quant/lake` mounted `ro,nosuid,nodev,noexec`, and loopback-only
+existing applications. This turn's unprivileged inventory found no proxy binary and could not read
+Tailscale or firewall state under the managed sandbox. Treat Tailscale Serve, DNS, certificates,
+proxy policy and IPv4/IPv6/DNS egress as not verified until the operator runs the privileged `doctor`
+and records the administrator-owned ruleset. Do not recreate the verified Quant identity, lake mount,
+audit objects or review image merely because this sandbox cannot inspect their protected state.
 
 ### Required identity and mount design
 
@@ -160,8 +164,10 @@ the approved SIDDU runtime. See [Deployment](../deploy/README.md) for the stagin
 
 ## Staging identity and HTTP policy
 
-The IdP owner must supply a non-production client and record these exact values in restricted staging
-configuration and release evidence:
+The private-staging IdP is local Keycloak, segregated under the `stram-auth` rootless identity and a
+dedicated PostgreSQL database/volume. The committed realm template supplies confidential service
+accounts and claim mappers, but only the live token and discovery checks are evidence. Record these
+exact values in restricted staging configuration and release evidence:
 
 - issuer: the token `iss` value and `STRAM_MCP_ISSUER_URL`, byte-for-byte equivalent after configured
   URL parsing;
@@ -176,6 +182,26 @@ Tokens must contain `exp`, `iat`, `iss`, `aud`, `sub`, `client_id` or `azp`, ten
 `scp`. The verifier allows 30 seconds of clock leeway. Missing, forged, expired, wrong-audience,
 wrong-tenant and insufficient-scope tokens must be exercised through the staging HTTP endpoint before
 any real-lake call.
+
+### Local Keycloak lifecycle
+
+Use the single workflow in [Deployment](../deploy/README.md). The optimized Keycloak image, its
+official base, and PostgreSQL must all be pinned by reviewed registry digests. Keycloak runs
+`start --optimized` with a fixed HTTPS hostname, fixed separate admin hostname, non-dynamic
+backchannel, explicit `xforwarded` proxy handling, bounded queued requests, private health/metrics and
+no development mode. The private proxy must overwrite forwarding headers and block frontend access to
+administration and the master realm; setting `hostname-admin` alone does not block those paths.
+
+Realm import runs only when `stram-staging` does not already exist. It resolves client secrets from
+Podman-secret environment injection and never overwrites an existing realm. A later template change is
+configuration drift: export/backup PostgreSQL, review an Admin API migration and test rollback rather
+than deleting or blindly re-importing the realm.
+
+Back up Keycloak through a consistent PostgreSQL-native backup while Keycloak is quiesced or through an
+approved online PostgreSQL procedure. Realm JSON export is configuration-transfer evidence, not a
+complete backup: it omits some sessions/events and is not consistent while nodes are changing. Restore
+PostgreSQL and the matching Keycloak image/configuration into isolation, require database health,
+Keycloak readiness, exact discovery/JWKS, token claims and negative tests before proxy routing.
 
 The private TLS proxy publishes no public listener and forwards only to the loopback container port.
 Set `STRAM_MCP_ALLOWED_HOSTS` to the exact client-facing private hostname, including a port only if the
