@@ -20,6 +20,8 @@ jobs:
           ref: 890b44911b56d0f165cfa7962032d00292b4e10e # pragma: allowlist secret; public commit
           token: ${{ secrets.STRAM_DATA_READ_TOKEN }}
           path: stram_data
+          # prepare_container_dependency.sh verifies the v1.3.1 tag resolves to the pinned commit.
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           python-version: "3.12"
