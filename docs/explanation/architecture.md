@@ -183,5 +183,5 @@ hash. A mismatch fails startup. Schemas and their SHA-256 hashes are checked int
 | SIDDU operators | Identity, mounts, secrets, networking, image, backup and rollback | Ad hoc Data Plane mutation |
 
 See [Tool reference](../reference/tools.md) for contracts, [Operations](../how-to/operate-the-service.md) for controls and
-[ADR 002](../../../stram_data/docs/adr/002-data-plane-and-data-interface-boundaries.md) for the upstream
-boundary decision.
+ADR 002 in the sibling `stram_data` repository (`docs/adr/002-data-plane-and-data-interface-boundaries.md`) for the
+upstream boundary decision.
