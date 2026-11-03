@@ -6,7 +6,8 @@ Streamable HTTP. This repository owns transport, identity, authorization, bounds
 audit and telemetry. It does not own SQL, financial calculations, ingestion, lake schemas or AI
 orchestration.
 
-Status on 2026-10-31: M0-M5 are locally implemented and independently reviewed. Local tests and
+Status on 2026-11-03: the server runs on FastMCP by default (milestone M7); the previous server remains
+selectable as a rollback aid. Status on 2026-10-31: M0-M5 are locally implemented and independently reviewed. Local tests and
 synthetic-lake integration pass. M6 SIDDU staging is **not deployed or production-verified** and still
 requires separate authorization and production decisions recorded in [PLANS.md](PLANS.md).
 
@@ -27,7 +28,7 @@ flowchart LR
 Every call is authenticated and authorized before worker dispatch. The worker receives only a tool
 name, validated arguments and a request ID. It imports only the public Data Interface. Terminal
 success, denial and failure outcomes are appended to the audit chain; an audit append failure fails
-the call closed. See [Architecture](docs/ARCHITECTURE.md) for the complete lifecycle and boundaries.
+the call closed. See [Architecture](docs/explanation/architecture.md) for the complete lifecycle and boundaries.
 
 ## Quick start
 
@@ -65,15 +66,17 @@ Use the entry point that matches the job:
 
 | Need | Document |
 |---|---|
-| Understand boundaries and failure behavior | [Architecture](docs/ARCHITECTURE.md) |
-| Install, test and connect a client | [Onboarding](docs/ONBOARDING.md) |
-| Look up tool schemas, scopes and errors | [Tool reference](docs/TOOLS.md) |
-| Build, stage, monitor, recover or roll back | [Operations](docs/OPERATIONS.md) |
+| Find any page by what you want to do | [Documentation index](docs/README.md) |
+| Add a tool | [How to add a tool](docs/how-to/add-a-tool.md) |
+| Understand boundaries and failure behavior | [Architecture](docs/explanation/architecture.md) |
+| Install, test and connect a client | [Onboarding](docs/how-to/set-up-and-connect-a-client.md) |
+| Look up tool schemas, scopes and errors | [Tool reference](docs/reference/tools.md) |
+| Build, stage, monitor, recover or roll back | [Operations](docs/how-to/operate-the-service.md) |
 | Review SIDDU prerequisites and templates | [Deployment](deploy/README.md) |
 | Read the consolidated STRAM HQ M6 handoff | [STRAM HQ handoff](docs/STRAM_HQ_HANDOFF.md) |
 | See milestone evidence and unresolved decisions | [Plans](PLANS.md) |
 | Apply normative engineering rules | [Engineering standards](ENGINEERING.md) |
-| Review the PyArrow exception | [Security exceptions](docs/SECURITY_EXCEPTIONS.md) |
+| Review the PyArrow exception | [Security exceptions](docs/reference/security-exceptions.md) |
 | Read release-candidate notes | [Changelog](CHANGELOG.md) |
 
 Do not deploy, access production secrets, change SIDDU, tag or push without separate authorization.

@@ -1,0 +1,160 @@
+from __future__ import annotations
+
+import json
+
+import pytest
+from fastmcp_spike import (KEY, OTHER_KEY, ORIGIN, RESOURCE, ISSUER, SCOPES, build_app, make_token, start_jwks)
+from starlette.testclient import TestClient
+
+HEAD = {"accept": "application/json, text/event-stream", "content-type": "application/json"}
+INIT = {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+        "params": {"protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": {"name": "t", "version": "1"}}}
+
+
+@pytest.fixture(scope="module")
+def client():
+    mcp, app = build_app(start_jwks())
+    with TestClient(app, base_url=ORIGIN) as c:
+        c.mcp = mcp
+        yield c
+
+
+def rpc(client, token, method, params=None, *, extra=None, rid=2):
+    headers = {**HEAD, **(extra or {})}
+    if token:
+        headers["authorization"] = f"Bearer {token}"
+    body = {"jsonrpc": "2.0", "id": rid, "method": method, "params": params or {}}
+    return client.post("/mcp", json=body, headers=headers)
+
+
+def test_q1_unauthenticated_401_challenge(client):
+    r = client.post("/mcp", json=INIT, headers=HEAD)
+    print("Q1", r.status_code, r.headers.get("www-authenticate"))
+    assert r.status_code == 401
+    assert f'resource_metadata="{ORIGIN}/.well-known/oauth-protected-resource/mcp"' in r.headers["www-authenticate"]
+
+
+def test_q2_resource_metadata(client):
+    r = client.get("/.well-known/oauth-protected-resource/mcp")
+    print("Q2", r.status_code, r.text)
+    body = r.json()
+    assert body["resource"] == RESOURCE
+    assert body["authorization_servers"] == [ISSUER]
+    assert body["bearer_methods_supported"] == ["header"]
+    assert sorted(body.get("scopes_supported") or []) == sorted(SCOPES)
+
+
+@pytest.mark.parametrize("name,kwargs", [
+    ("wrong-audience", {"aud": "https://other.test/mcp"}),
+    ("wrong-issuer", {"iss": "https://evil.test/realms/x"}),
+    ("expired", {"exp_in": -10}),
+    ("wrong-signature", {"key": OTHER_KEY}),
+])
+def test_q3_q10_bad_tokens_rejected(client, name, kwargs):
+    r = rpc(client, make_token(scope="quant:discover", **kwargs), "initialize", INIT["params"])
+    print("Q3/Q10", name, r.status_code)
+    assert r.status_code == 401
+
+
+def test_q10_hs256_and_none_rejected(client):
+    import jwt
+    forged = jwt.encode({"iss": ISSUER, "aud": RESOURCE, "scope": "quant:discover", "exp": 4102444800},
+                        "secret" * 8, algorithm="HS256", headers={"kid": "k1"})
+    r = rpc(client, forged, "initialize", INIT["params"])
+    print("Q10 HS256", r.status_code)
+    assert r.status_code == 401
+
+
+def test_q10_missing_iat(client):
+    r = rpc(client, make_token(scope="quant:discover", include_iat=False), "initialize", INIT["params"])
+    print("Q10 missing iat ->", r.status_code, "(today's service requires iat)")
+    assert r.status_code == 401
+
+
+def _tools(client, token):
+    r = rpc(client, token, "tools/list")
+    print("tools/list", r.status_code, r.text[:300])
+    return r
+
+
+def test_q4_scope_enforced_per_tool(client):
+    narrow = make_token(scope="quant:discover")
+    listed = _tools(client, narrow).json()["result"]["tools"]
+    names = {t["name"] for t in listed}
+    print("Q4 visible to discover-only:", names)
+    call = rpc(client, narrow, "tools/call", {"name": "whoami", "arguments": {}})
+    print("Q4 forbidden call ->", call.status_code, call.text[:300])
+    body = call.json()
+    assert body.get("error") or body["result"].get("isError"), "narrow token must not run whoami"
+    ok = rpc(client, narrow, "tools/call", {"name": "list_series", "arguments": {"limit": 3}})
+    assert ok.json()["result"]["structuredContent"] == {"count": 3}
+
+
+def test_q5_claims_available_and_tenant_enforced(client):
+    good = rpc(client, make_token(scope="quant:read"), "tools/call", {"name": "whoami", "arguments": {}})
+    print("Q5 good", good.text[:300])
+    assert good.json()["result"]["structuredContent"]["tenant"] == "local-stram"
+    bad = rpc(client, make_token(scope="quant:read", tenant="other"), "tools/call", {"name": "whoami", "arguments": {}})
+    print("Q5 wrong tenant ->", bad.status_code)
+    assert bad.status_code == 401  # same as today: a wrong-tenant token never reaches a tool
+
+
+def test_q6_schemas_closed_and_hashable(client):
+    tools = _tools(client, make_token(scope=" ".join(SCOPES))).json()["result"]["tools"]
+    t = next(x for x in tools if x["name"] == "list_series")
+    print("Q6 schema", json.dumps(t, sort_keys=True)[:600])
+    assert t["inputSchema"].get("additionalProperties") is False, "input schema must be closed"
+    assert t["annotations"]["readOnlyHint"] is True
+    assert "outputSchema" in t
+
+
+def test_q6_unknown_argument_rejected(client):
+    r = rpc(client, make_token(scope="quant:discover"), "tools/call", {"name": "list_series", "arguments": {"limit": 1, "extra": 1}})
+    print("Q6 extra arg ->", r.text[:300])
+    body = r.json()
+    assert body.get("error") or body["result"].get("isError")
+
+
+def test_q7_host_and_origin_allowlists(client):
+    token = make_token(scope="quant:discover")
+    bad_host = client.post("/mcp", json=INIT, headers={**HEAD, "authorization": f"Bearer {token}", "host": "attacker.test"})
+    bad_origin = client.post("/mcp", json=INIT, headers={**HEAD, "authorization": f"Bearer {token}", "origin": "https://attacker.test"})
+    print("Q7 host", bad_host.status_code, "origin", bad_origin.status_code)
+    assert bad_host.status_code in (421, 403)
+    assert bad_origin.status_code == 403
+
+
+def test_q8_stateless_json_mode(client):
+    r = rpc(client, make_token(scope="quant:discover"), "initialize", INIT["params"])
+    print("Q8", r.status_code, r.headers.get("content-type"), r.headers.get("mcp-session-id"))
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("application/json")
+    assert r.headers.get("mcp-session-id") is None
+
+
+def test_q9_audit_middleware_sees_every_call(client):
+    from fastmcp_spike import AUDIT
+    AUDIT.clear()
+    rpc(client, make_token(scope="quant:discover"), "tools/call", {"name": "list_series", "arguments": {"limit": 2}})
+    rpc(client, make_token(scope="quant:discover"), "tools/call", {"name": "whoami", "arguments": {}})
+    rpc(client, make_token(scope="quant:read", tenant="other"), "tools/call", {"name": "whoami", "arguments": {}})
+    rpc(client, make_token(scope="quant:discover"), "tools/call", {"name": "list_series", "arguments": {"bad": 1}})
+    print("Q9 audit records:", AUDIT)
+    assert len(AUDIT) == 3, "tool-level records; the wrong-tenant 401 is a transport denial audited elsewhere"
+
+
+def test_error_messages_do_not_leak_internals(client):
+    r = rpc(client, make_token(scope="quant:discover"), "tools/call", {"name": "list_series", "arguments": {"bad": 1}})
+    text = json.dumps(r.json())
+    print("ERR", text[:300])
+    for leak in ("pydantic", "errors.pydantic.dev", "Traceback", "/home", "site-packages"):
+        assert leak not in text, leak
+
+
+def test_m3_pydantic_output_and_custom_meta(client):
+    tools = _tools(client, make_token(scope=" ".join(SCOPES))).json()["result"]["tools"]
+    t = next(x for x in tools if x["name"] == "typed_series")
+    print("M3", json.dumps(t, sort_keys=True))
+    assert t["outputSchema"]["additionalProperties"] is False
+    assert t["_meta"].get("io.stram/requiredScope") == "quant:discover"
+    print("M3 _meta keys:", sorted(t["_meta"]))

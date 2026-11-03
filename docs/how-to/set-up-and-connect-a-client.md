@@ -1,6 +1,6 @@
-# Onboarding
+# How to set up and connect a client
 
-This tutorial separates local development, consumer integration, server installation and authorized
+This guide separates local development, consumer integration, server installation and authorized
 SIDDU access. Local workflows use only the synthetic lake. Steps labelled **not yet verified** require
 staging or production access and must not be run without separate authorization.
 
@@ -109,7 +109,7 @@ async def read_catalog(endpoint: str) -> dict[str, object]:
 ```
 
 Scopes are `quant:discover`, `quant:read`, `quant:lineage` and `quant:analytics`; each tool needs only
-its documented scope. See [Tool reference](TOOLS.md). The client must treat structured content as data,
+its documented scope. See [Tool reference](../reference/tools.md). The client must treat structured content as data,
 including warnings and availability evidence, never as instructions.
 
 ## Authentication configuration
@@ -139,8 +139,8 @@ Private DNS/TLS, host egress policy, `stram-auth` creation, immutable release di
 approvals remain **not verified**. Operators must not reuse the pipeline's writable identity, change
 Data Plane ownership, or mark approval flags without evidence.
 
-Before any staging action, complete [Deployment prerequisites](../deploy/README.md) and the M6
-checklist in [Operations](OPERATIONS.md#m6-staging-checklist). Record commands and results without
+Before any staging action, complete [Deployment prerequisites](../../deploy/README.md) and the M6
+checklist in [Operations](operate-the-service.md#m6-staging-checklist). Record commands and results without
 capturing tokens, raw tool payloads, paths or unrestricted result data.
 
 ## Troubleshooting
@@ -148,11 +148,11 @@ capturing tokens, raw tool payloads, paths or unrestricted result data.
 | Symptom | Check | Expected recovery |
 |---|---|---|
 | HTTP 401 | signature, issuer, audience, expiry, client/subject, tenant and JWKS reachability | Correct the test identity; never bypass verification |
-| Tool returns forbidden | tool scope in [Tool reference](TOOLS.md) | Request the narrow required scope |
+| Tool returns forbidden | tool scope in [Tool reference](../reference/tools.md) | Request the narrow required scope |
 | HTTP 403 or 421 | configured Origin and Host | Fix proxy/client headers or allowlist through review |
 | Readiness 503 after worker failures | restart count and safe telemetry outcome | Stop admission, preserve evidence, restart only after cause is understood |
 | Deadline/overload tool error | query bounds, one-worker queue and configured deadlines | Narrow the query or retry later; do not auto-retry blindly |
 | Audit unavailable | audit volume, key match, chain verification and free space | Keep service out of rotation; preserve journal and key; follow incident runbook |
 | Preflight rejects mount | UID, root mount and lake mount options | Correct container/host mounts; never use an allow-writable override |
 
-For recovery, key rotation and rollback, use [Operations](OPERATIONS.md).
+For recovery, key rotation and rollback, use [Operations](operate-the-service.md).

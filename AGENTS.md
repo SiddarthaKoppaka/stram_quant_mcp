@@ -19,5 +19,5 @@ Knowledge-transfer references are in `../stram_data/docs/README.md`, especially 
 `docs/quant/DATA_INTERFACE.md`.
 
 Start repository work from [README.md](README.md). Architecture, onboarding, tool contracts and
-operations live under [docs/](docs/ARCHITECTURE.md); deployment prerequisites are in
+operations live under [docs/](docs/explanation/architecture.md); deployment prerequisites are in
 [deploy/README.md](deploy/README.md). Do not copy those details into this file.

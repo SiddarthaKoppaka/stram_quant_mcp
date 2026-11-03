@@ -24,3 +24,24 @@ Exceptions block release unless every field below remains current. They are not 
 Overriding `stram-data`'s declared `pyarrow<23` range in this service was rejected because an untested
 dependency override creates a larger data-correctness and compatibility risk than this unreachable
 Python-binding advisory.
+
+## CVE-2026-102554 / GHSA-xxph-c9ww-hj94
+
+- **Dependency:** `com.google.guava:guava==33.6.0-jre`, bundled by the optimized Keycloak 26.8.1
+  staging image
+- **Severity:** high in the pinned Trivy 0.68.1 scan (the upstream Guava advisory rates it moderate)
+- **Owner:** Stram Quant MCP staging security/release owner
+- **Review date:** 2026-11-01
+- **Expiry:** 2026-12-01, or immediately when an approved Keycloak image includes Guava 33.7.2+
+- **Source:** [Guava advisory GHSA-xxph-c9ww-hj94](https://github.com/google/guava/security/advisories/GHSA-xxph-c9ww-hj94)
+- **Affected surface:** denial of service during Java native deserialization of crafted
+  `CompactHashMap`, `CompactHashSet`, or `MapMakerInternalMap` objects.
+- **Applicability:** no Java native-serialization endpoint is exposed by the reviewed staging
+  topology. Only Keycloak OIDC realm paths are published over tailnet-only HTTPS; the admin and
+  management endpoints remain loopback-only. This is a constrained residual-risk assessment, not
+  a claim that the transitive library is absent or independently approved.
+- **Mitigations:** private Tailscale access; no Funnel or public listener; confidential service
+  clients; bounded Keycloak memory, PIDs, request queue and systemd restart rate; management and
+  admin paths excluded from the proxy.
+- **Resolution:** rebuild and rescan from the first supported Keycloak 26 image that contains Guava
+  33.7.2 or later, re-run live OIDC/MCP acceptance, then remove this exception.

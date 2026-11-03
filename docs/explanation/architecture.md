@@ -1,4 +1,4 @@
-# Architecture
+# About the architecture
 
 This service is a thin, independently deployable MCP Tool Plane. It turns authenticated MCP requests
 into calls to the frozen public `stram_data.data_interface` 1.3.1 API. Quantitative semantics stay in
@@ -75,6 +75,38 @@ must carry the configured issuer, tenant and tool-specific scope. Invalid tool n
 arguments never reach the Data Interface. The official MCP annotations are descriptive; server-side
 policy is authoritative.
 
+## About per-call access control
+
+The server runs on FastMCP. Three layers of middleware wrap every tool call, outermost first:
+telemetry, safe error shaping, and access control. Access control asks one authority, a default-deny
+policy store, the same question twice: which tools may this caller see, and may this caller run this
+tool now. Because one decision backs both answers, a tool a caller cannot use is never listed and a
+direct call to it is refused as `Access denied.`, not reported as missing.
+
+```mermaid
+flowchart LR
+    R[tool call] --> T[telemetry]
+    T --> E[safe error shaping]
+    E --> A{policy store<br/>and throttle}
+    A -->|no grant| D[Access denied<br/>audit, count denial]
+    A -->|granted| V[closed Pydantic<br/>validation]
+    V --> I[invocation service<br/>re-check, rate, worker, audit]
+```
+
+The invocation service repeats the scope, tenant and issuer check after the middleware has passed the
+call, so a defect in either layer alone cannot grant access. A caller who is denied too often inside a
+sliding window is blocked from every tool until the denials age out; every further attempt extends the
+block. Memory for this is bounded, and one caller's denials never affect another caller.
+
+Failures reach the caller only as a fixed message plus a `retryable` flag. The service itself never
+retries a data query; the flag tells the client whether trying again could ever help. An access denial
+is never retryable. See the [tool reference](../reference/tools.md#error-replies) for the full table.
+
+Token checks are stricter than the framework's own. The verifier behind FastMCP's Keycloak provider
+additionally requires `iat`, a subject, a client (`client_id` or `azp`), the admitted tenant and at
+least one scope, and it discards the bearer credential after verification. The service refuses to
+become ready until the JWKS endpoint has served a signing key.
+
 ## Security boundaries
 
 ```mermaid
@@ -150,6 +182,6 @@ hash. A mismatch fails startup. Schemas and their SHA-256 hashes are checked int
 | `stram_data.data_interface` | Queries, availability, revisions, lineage, analytics, bounds | MCP, authentication or orchestration |
 | SIDDU operators | Identity, mounts, secrets, networking, image, backup and rollback | Ad hoc Data Plane mutation |
 
-See [Tool reference](TOOLS.md) for contracts, [Operations](OPERATIONS.md) for controls and
-[ADR 002](../../stram_data/docs/adr/002-data-plane-and-data-interface-boundaries.md) for the upstream
+See [Tool reference](../reference/tools.md) for contracts, [Operations](../how-to/operate-the-service.md) for controls and
+[ADR 002](../../../stram_data/docs/adr/002-data-plane-and-data-interface-boundaries.md) for the upstream
 boundary decision.

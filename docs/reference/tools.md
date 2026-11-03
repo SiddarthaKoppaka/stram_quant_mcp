@@ -208,13 +208,48 @@ is undetermined, not false. The default next-close entry prevents same-close loo
 |---|---|---|
 | Missing/invalid bearer token | HTTP 401 | `authentication_denied` |
 | Disallowed Host/Origin | HTTP 421/403 | `transport_denied` |
-| Wrong tenant or missing scope | MCP safe forbidden error | `authorization_denied` |
+| Wrong tenant, missing scope or no grant | MCP error `Access denied.`, not retryable | `authorization_denied` |
+| Caller blocked after repeated denials | MCP error `Access denied.`, not retryable | `denial_throttled` |
 | Invalid tool/input | MCP safe invalid-request error | `invalid_tool` or `error` |
 | Rate or queue capacity | Retryable MCP overload error | `rate_limited` or `error` |
 | Worker timeout/crash/resource cap | Safe retryable/non-retryable MCP error | `error` |
 | Client cancellation | Request cancellation | `cancelled` after bounded cleanup |
 | Success | Structured result | `success`, row count and truncation only |
 | Audit append failure | Safe unavailable response | No call result is released; readiness becomes false |
+
+### Error replies
+
+Every failed call returns `isError=true` and one fixed message from a closed set; no exception text,
+validation detail, path or stack trace is ever included. The FastMCP server also tells the client
+whether retrying can help, in the result's `_meta`:
+
+```json
+{
+  "isError": true,
+  "content": [{"type": "text", "text": "Access denied."}],
+  "_meta": {"io.stram/error": {"code": "access_denied", "retryable": false}}
+}
+```
+
+| `code` | Message | `retryable` |
+|---|---|---|
+| `access_denied` | `Access denied.` | no |
+| `invalid_request` | The tool arguments are invalid or outside the allowed bounds. | no |
+| `not_found` | The requested quantitative data entity was not found. | no |
+| `resource_limit` | The quantitative result exceeds the allowed resource budget. | no |
+| `unavailable` | Quantitative data is temporarily unavailable. | yes, after a client-side backoff |
+| `deadline_exceeded` | The quantitative query exceeded its deadline. | yes, after a client-side backoff |
+| `overloaded` | The quantitative service is at capacity. | yes, after a client-side backoff |
+
+The service never retries a data query itself. A caller that is denied is not told why, so it cannot
+learn which scope, tenant or issuer check failed.
+
+### Tool visibility
+
+`tools/list` returns only the tools the caller may call, decided by the same policy store that
+authorizes each call. A call to a tool the caller cannot use is refused as `Access denied.`, exactly
+like a tool that exists but is not granted. A name outside the reviewed catalogue returns the
+invalid-request reply.
 
 Audit stores normalized accountability fields and selected data scope, not raw request/result payloads
 or bearer tokens. Logs/traces/metrics store only allowlisted outcome metadata.

@@ -87,6 +87,74 @@ transport -> authentication/policy -> tool application layer -> worker boundary
 - Public names and configuration keys MUST be clear and domain-specific. Avoid opaque abbreviations,
   generic `utils.py` dumping grounds, and misleading terms such as “verified” for modeled data.
 
+### 3.1 Readability and structure rules
+
+These rules make the code understandable to a new reader. They are normative for new and changed code.
+Existing code is not refactored for its own sake: its violations are recorded in the lint baseline in
+`pyproject.toml` (see [Baseline and ratchet](#33-baseline-and-ratchet)), which may only shrink.
+
+| # | Rule | Enforcement |
+|---|---|---|
+| R1 | A function MUST be at most 50 statements and SHOULD fit in about 40 lines. Split by named step, not by arbitrary length. | Ruff `PLR0915`; review |
+| R2 | Cyclomatic complexity MUST be 10 or lower. | Ruff `C901` |
+| R3 | A function MUST take at most 5 parameters and have at most 6 return points. Group related values in a named, immutable type. | Ruff `PLR0913`, `PLR0911` |
+| R4 | Nesting SHOULD NOT exceed three levels. Use early returns and small helpers. | Review |
+| R5 | A module SHOULD stay under about 400 lines and MUST have one reason to change. Split by responsibility, never into `utils.py`. | Review |
+| R6 | Entry points (`main`, request handlers, CLI commands) MUST only parse input and call named steps. They contain no business logic. | Review |
+| R7 | Nested functions and closures are allowed only to capture a local value. Shared logic belongs in a module-level function or class. | Review |
+| R8 | Every public module, class and function MUST have a docstring stating its purpose and its non-obvious `Args`, `Returns` and `Raises`. Tests are exempt. | Ruff `D` (Google convention) |
+| R9 | Comments MUST explain why, a constraint or evidence. They MUST NOT describe what the code does. Commented-out code MUST be deleted. | Ruff `ERA001`; review |
+| R10 | Names MUST be full, domain-specific words. Avoid abbreviations and generic names such as `data`, `info`, `manager` or `helper`. Follow PEP 8. | Ruff `N`; review |
+| R11 | Literal numbers and strings with meaning MUST be named constants. | Ruff `PLR2004` |
+| R12 | Catch-all `except`, `assert` used for validation, and mutable default arguments MUST NOT be used. | Ruff `BLE001`, `S101`, `B006` |
+| R13 | Each security invariant (audience check, scope check, tenant check, redaction, schema hash) MUST live in one named place with a docstring and a test that fails if it is removed. | Review; tests |
+| R14 | A layer MAY import only from the layers below it. See [Import boundaries](#32-import-boundaries). | `import-linter` |
+| R15 | A test MUST be named for the behavior it checks, check one behavior, and contain no conditional logic. | Review |
+| R16 | A refactor and a behavior change MUST NOT share a change. A refactor MUST NOT alter a tool contract or schema hash. | Review; schema gate |
+
+### 3.2 Import boundaries
+
+The package is a stack of layers, enforced by `lint-imports` (contracts in `pyproject.toml`). A module may
+import only from layers beneath it; modules on the same line are independent of each other.
+
+1. `entrypoint`
+2. `app`
+3. `server` (transport and tool registration)
+4. `policy`, `auth` (authorization and identity)
+5. `worker` (isolated execution)
+6. `tool_adapter`
+7. `tool_registry`
+8. `tool_models`
+9. `settings`, `errors` (shared foundations)
+
+`audit` and `telemetry` are independent of each other. Nothing in `src/` imports from `tools/`, and
+nothing imports a private `stram_data` module. A new layer or an upward import needs an ADR in `PLANS.md`.
+
+### 3.3 Baseline and ratchet
+
+- The lint rules above are enabled repository-wide. Files that predate them list the rules they still
+  violate in `[tool.ruff.lint.per-file-ignores]` under a `# legacy baseline` comment.
+- A change MAY remove entries from the baseline. A change MUST NOT add an entry or touch a legacy
+  function beyond what its purpose requires. If you edit a legacy function, bring that function within
+  the rules.
+- New files MUST NOT appear in the baseline.
+
+### 3.4 Framework rules
+
+- The server framework is FastMCP, pinned to one exact reviewed release. Application code uses the
+  framework's public API only, never its private modules.
+- Tool definitions are declared with the framework's decorators, one tool per small function that
+  delegates to the existing adapter. A tool function validates nothing by hand that its input model
+  already validates.
+- Cross-cutting behavior (authentication, scope checks, audit, rate limiting, redaction) is added as
+  framework middleware or authorization checks, not copied into tool functions.
+- The framework version MUST NOT change without running the full contract and security suites and the
+  tool-schema gate.
+- The previous SDK server stays selectable through `STRAM_MCP_SERVER_IMPLEMENTATION=sdk` only as a
+  rollback aid. Owner: the maintainer who approves the FastMCP release. Removal condition: the FastMCP
+  release has passed M6 staging acceptance against the real identity provider and lake. Expiry: it is
+  deleted, with the old registry-free server code and its tests, in the first release after that.
+
 ## 4. MCP tool contract rules
 
 - One tool MUST perform one clearly described read-only operation and map to named public Data
@@ -249,6 +317,14 @@ transport -> authentication/policy -> tool application layer -> worker boundary
 - Commits and pushes remain separately authorized. When authorized, history SHOULD be understandable,
   with no generated noise, secrets, unrelated formatting churn, or disabled checks.
 - Temporary compatibility code and feature flags require an owner, removal condition, and expiry.
+- Documentation MUST follow the [Diátaxis](https://diataxis.fr/) structure in `docs/`. Each page has one
+  purpose and one type: a **tutorial** teaches a beginner by guided doing, a **how-to guide** helps a
+  competent reader finish one task, **reference** neutrally describes facts, and **explanation**
+  discusses why. Do not mix types on one page; link instead of repeating.
+- Tutorials MUST work every time and show expected output. How-to titles say what they achieve ("How to
+  ..."). Reference mirrors the code and contains no instructions. Explanation titles start "About ...".
+- `docs/README.md` MUST link every page. Documentation commands, links and examples are checked by
+  `tools/check_docs.py` and MUST pass.
 
 ## 12. CI quality gates
 
@@ -262,6 +338,8 @@ The merge/release pipeline MUST fail on:
 - seeded secret/path leakage in errors, logs, traces, metrics, audit, or tool output;
 - container running as root, writable lake/root filesystem, excess capabilities, or unexpected egress;
 - missing SBOM/provenance/schema hashes/test evidence for a release artifact.
+- a readability-rule or import-boundary violation outside the recorded legacy baseline, or a baseline that grew;
+- a documentation page missing from `docs/README.md` or a broken documentation link or example.
 
 CI permissions MUST be read-only by default, third-party actions MUST be pinned to reviewed immutable
 revisions, and untrusted pull-request code MUST not receive release credentials.

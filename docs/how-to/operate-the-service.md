@@ -1,4 +1,7 @@
-# Operations
+# How to operate the service
+
+> This runbook still mixes task steps with reference tables and background. It is queued to be split
+> into separate how-to, reference and explanation pages as the migration touches each section.
 
 This runbook covers the V1 single-replica service. Local and synthetic-lake behavior is verified. By
 2026-11-01 the dedicated Quant identity, kernel-enforced read-only real-lake view, audit volume/HMAC
@@ -61,8 +64,8 @@ worker restart cap/backoff/shutdown budget, bind host and port. Defaults are thr
 replacements, 0.25-second replacement delay and five-second shutdown drain. Security and correctness
 defaults require review before change; update policy/release evidence with any change.
 
-Use [service.env.example](../deploy/service.env.example) and
-[runtime.env.example](../deploy/runtime.env.example) as field inventories, not ready-to-run files.
+Use [service.env.example](../../deploy/service.env.example) and
+[runtime.env.example](../../deploy/runtime.env.example) as field inventories, not ready-to-run files.
 They contain no bearer token or audit key.
 
 ## Startup and health
@@ -160,7 +163,7 @@ worker used by the server after its seccomp filter is installed and calls the pi
 Interface; it detects a filter that breaks legitimate DuckDB/Parquet work.
 
 The older Docker user-systemd template is retained for reference under `deploy/systemd/`; it is not
-the approved SIDDU runtime. See [Deployment](../deploy/README.md) for the staging checklist.
+the approved SIDDU runtime. See [Deployment](../../deploy/README.md) for the staging checklist.
 
 ## Staging identity and HTTP policy
 
@@ -185,7 +188,7 @@ any real-lake call.
 
 ### Local Keycloak lifecycle
 
-Use the single workflow in [Deployment](../deploy/README.md). The optimized Keycloak image, its
+Use the single workflow in [Deployment](../../deploy/README.md). The optimized Keycloak image, its
 official base, and PostgreSQL must all be pinned by reviewed registry digests. Keycloak runs
 `start --optimized` with a fixed HTTPS hostname, fixed separate admin hostname, non-dynamic
 backchannel, explicit `xforwarded` proxy handling, bounded queued requests, private health/metrics and
@@ -310,14 +313,22 @@ discovery tool with a non-production credential. Record exact digests and outcom
    correctness to `stram_data`; never patch the lake here.
 6. Re-enable only after verification, readiness and an approved incident decision.
 
-## PyArrow security exception
+## Staging security exceptions
 
 The frozen Data Plane requires `pyarrow==22.0.0`, affected by CVE-2026-25087 in an Arrow IPC C++ path
 not exposed through the Python bindings used here. The service accepts no files, paths, IPC payloads,
 URLs or arbitrary queries and reads only a curated read-only Parquet lake in an isolated worker. This
 reviewed high-severity exception expires 2027-01-31 or when an approved `stram-data` release supports
 PyArrow 23.0.1 or later. Full owner, evidence and removal trigger are in
-[Security exceptions](SECURITY_EXCEPTIONS.md). It remains a release exception, not a general waiver.
+[Security exceptions](../reference/security-exceptions.md). It remains a release exception, not a general waiver.
+
+The optimized Keycloak 26.8.1 staging image also contains Guava 33.6.0-jre and therefore reports
+CVE-2026-102554. No Java native-serialization endpoint is exposed in the reviewed OIDC-only private
+topology, but this is residual risk rather than a claim of absence. The exception expires 2026-12-01
+or when an approved Keycloak image contains Guava 33.7.2+, whichever comes first. PostgreSQL 17.11 is
+rebuilt to run directly as UID/GID 999 and remove the unused vulnerable `gosu` helper; its final
+HIGH/CRITICAL scan is clean. Exact fields and compensating controls are in
+[Security exceptions](../reference/security-exceptions.md).
 
 ## M6 staging checklist
 

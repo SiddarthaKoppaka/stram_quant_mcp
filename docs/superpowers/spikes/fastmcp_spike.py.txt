@@ -1,0 +1,131 @@
+"""Throwaway spike: can FastMCP meet the Quant MCP security behaviors? Not production code."""
+from __future__ import annotations
+
+import json
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+import jwt
+from cryptography.hazmat.primitives.asymmetric import rsa
+from fastmcp import FastMCP
+from fastmcp.server.auth import RemoteAuthProvider, require_scopes
+from fastmcp.server.auth.providers.jwt import JWTVerifier
+from fastmcp.server.dependencies import get_access_token
+
+ISSUER = "https://idp.test/realms/stram"
+RESOURCE = "https://mcp.test/mcp"
+ORIGIN = "https://mcp.test"
+TENANT = "local-stram"
+SCOPES = ["quant:discover", "quant:read", "quant:lineage", "quant:analytics"]
+
+KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+OTHER_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+
+def _jwks() -> bytes:
+    jwk = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(KEY.public_key()))
+    jwk.update(kid="k1", alg="RS256", use="sig")
+    return json.dumps({"keys": [jwk]}).encode()
+
+
+class _Handler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:  # noqa: N802
+        body = _jwks()
+        self.send_response(200)
+        self.send_header("content-type", "application/json")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args: object) -> None:
+        pass
+
+
+def start_jwks() -> str:
+    server = HTTPServer(("127.0.0.1", 0), _Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return f"http://127.0.0.1:{server.server_port}/jwks.json"
+
+
+def make_token(*, scope: str, aud: str = RESOURCE, iss: str = ISSUER, tenant: str = TENANT,
+               exp_in: int = 300, key=KEY, alg: str = "RS256", include_iat: bool = True) -> str:
+    now = int(time.time())
+    claims = {"iss": iss, "aud": aud, "sub": "svc", "azp": "client", "tenant_id": tenant,
+              "scope": scope, "exp": now + exp_in}
+    if include_iat:
+        claims["iat"] = now
+    return jwt.encode(claims, key, algorithm=alg, headers={"kid": "k1"})
+
+
+from pydantic import BaseModel, ConfigDict
+
+
+class Series(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    count: int
+
+
+class StrictVerifier(JWTVerifier):
+    """Adds the Quant checks FastMCP's verifier lacks: iat, sub, azp/client_id, tenant."""
+
+    async def verify_token(self, token):
+        access = await super().verify_token(token)
+        if access is None:
+            return None
+        c = access.claims
+        if not (c.get("iat") and c.get("sub") and (c.get("azp") or c.get("client_id")) and c.get("tenant_id") == TENANT):
+            return None
+        return access
+
+
+AUDIT: list[tuple[str, str]] = []
+
+
+
+def build_app(jwks_uri: str):
+    verifier = StrictVerifier(jwks_uri=jwks_uri, issuer=ISSUER, audience=RESOURCE, algorithm="RS256")
+    auth = RemoteAuthProvider(token_verifier=verifier, authorization_servers=[ISSUER],
+                              base_url=ORIGIN, scopes_supported=SCOPES)
+    from fastmcp.exceptions import ToolError, ValidationError
+    from fastmcp.server.middleware import Middleware
+
+    class AuditMiddleware(Middleware):
+        async def on_call_tool(self, context, call_next):
+            name = context.message.name
+            try:
+                result = await call_next(context)
+            except ValidationError as error:
+                AUDIT.append((name, "error:ValidationError"))
+                raise ToolError("Invalid tool arguments.") from None
+            except Exception as error:  # noqa: BLE001 - spike only
+                AUDIT.append((name, f"error:{type(error).__name__}"))
+                raise
+            AUDIT.append((name, "ok"))
+            return result
+
+    mcp = FastMCP("spike", auth=auth, strict_input_validation=True, mask_error_details=True,
+                  middleware=[AuditMiddleware()])
+
+    @mcp.tool(auth=require_scopes("quant:discover"), annotations={"readOnlyHint": True})
+    def list_series(limit: int = 1) -> dict[str, int]:
+        """List series."""
+        return {"count": limit}
+
+    @mcp.tool(auth=require_scopes("quant:read"), annotations={"readOnlyHint": True})
+    def whoami() -> dict[str, str]:
+        """Return verified claims."""
+        token = get_access_token()
+        claims = token.claims if token else {}
+        if claims.get("tenant_id") != TENANT:
+            raise ValueError("tenant denied")
+        return {"tenant": claims["tenant_id"], "sub": str(claims.get("sub")), "azp": str(claims.get("azp"))}
+
+    @mcp.tool(auth=require_scopes("quant:discover"), annotations={"readOnlyHint": True, "idempotentHint": True,
+              "destructiveHint": False, "openWorldHint": False}, meta={"io.stram/requiredScope": "quant:discover"})
+    def typed_series(limit: int = 1) -> Series:
+        """Typed output."""
+        return Series(count=limit)
+
+    app = mcp.http_app(path="/mcp", json_response=True, stateless_http=True,
+                       host_origin_protection=True, allowed_hosts=["mcp.test"], allowed_origins=["https://client.example"])
+    return mcp, app
