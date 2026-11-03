@@ -1,4 +1,4 @@
-"""Audit behavior every implementation must preserve."""
+"""Audit behavior the service must preserve."""
 
 from __future__ import annotations
 

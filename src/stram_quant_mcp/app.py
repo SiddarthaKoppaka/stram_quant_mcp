@@ -8,31 +8,15 @@ import uvicorn
 from starlette.types import ASGIApp
 
 from stram_quant_mcp.fastmcp_server import create_fastmcp_application
-from stram_quant_mcp.server import create_application
 from stram_quant_mcp.settings import AppSettings
 from stram_quant_mcp.telemetry import configure_telemetry
 
-IMPLEMENTATION_VARIABLE = "STRAM_MCP_SERVER_IMPLEMENTATION"
-
 
 def create_from_env() -> ASGIApp:
-    """Build the service from the environment.
-
-    FastMCP is the default. ``STRAM_MCP_SERVER_IMPLEMENTATION=sdk`` selects the previous server as
-    a temporary rollback aid; it is removed once the FastMCP release has run in staging
-    (ENGINEERING.md section 3.4).
-
-    Raises:
-        ValueError: If the implementation name is not ``fastmcp`` or ``sdk``.
-    """
+    """Build the service from the environment."""
     settings = AppSettings.from_env()
     telemetry = configure_telemetry(settings)
-    implementation = os.environ.get(IMPLEMENTATION_VARIABLE, "fastmcp")
-    if implementation == "fastmcp":
-        return create_fastmcp_application(settings, telemetry=telemetry).app
-    if implementation == "sdk":
-        return create_application(settings, telemetry=telemetry).app
-    raise ValueError(f"{IMPLEMENTATION_VARIABLE} must be fastmcp or sdk")
+    return create_fastmcp_application(settings, telemetry=telemetry).app
 
 
 def main() -> None:

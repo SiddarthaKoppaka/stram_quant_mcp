@@ -6,8 +6,8 @@ Streamable HTTP. This repository owns transport, identity, authorization, bounds
 audit and telemetry. It does not own SQL, financial calculations, ingestion, lake schemas or AI
 orchestration.
 
-Status on 2026-11-03: the server runs on FastMCP by default (milestone M7); the previous server remains
-selectable as a rollback aid. Status on 2026-10-31: M0-M5 are locally implemented and independently reviewed. Local tests and
+Status on 2026-11-03: the server runs on FastMCP (milestone M7); the previous server is kept on the
+`archive/sdk-server` branch. Status on 2026-10-31: M0-M5 are locally implemented and independently reviewed. Local tests and
 synthetic-lake integration pass. M6 SIDDU staging is **not deployed or production-verified** and still
 requires separate authorization and production decisions recorded in [PLANS.md](PLANS.md).
 

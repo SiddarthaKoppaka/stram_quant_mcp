@@ -199,9 +199,8 @@ the operator performs that single terminal authentication; the three new service
 - Tasks 3 to 5 implemented in code (2026-11-03): `fastmcp==4.1.6` pinned (25 packages added, no existing
   version changed, no known vulnerabilities, 130 licenses reviewed); nine new modules; default-deny policy store
   with hidden tools; denial throttle; JWKS warm-up before readiness; `Access denied.` with `retryable` metadata;
-  request-body cap; FastMCP is the default in `app.py` with `STRAM_MCP_SERVER_IMPLEMENTATION=sdk` as a rollback
-  aid. The parity suite, the staging acceptance runner over real TLS and an official-client session pass against
-  FastMCP. Details: [implementation plan](docs/superpowers/plans/2026-11-03-fastmcp-migration.md).
+  request-body cap; FastMCP is the only server; the previous one is on the `archive/sdk-server` branch. The behavior suite, the
+  staging acceptance runner over real TLS and an official-client session pass. Details: [implementation plan](docs/superpowers/plans/2026-11-03-fastmcp-migration.md).
 - Not done, needs separate authorization: build and scan the image, approve its digest, run staging acceptance
   against the real Keycloak and lake, then remove the previous server (see ENGINEERING.md 3.4).
 - Behavior changes to communicate to clients: the denial message is now `Access denied.`; `tools/list` shows only

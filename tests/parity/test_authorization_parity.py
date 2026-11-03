@@ -1,4 +1,4 @@
-"""Per-tool authorization that every implementation must enforce on every call."""
+"""Per-tool authorization that the service must enforce on every call."""
 
 from __future__ import annotations
 

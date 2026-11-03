@@ -40,7 +40,7 @@ down.
 
 ## 4. Look at what the client received
 
-Open [the test](../../tests/integration/test_mcp_client.py) and find the call to `list_tools`. Each tool
+Open [the test](../../tests/integration/test_fastmcp_client.py) and find the call to `list_tools`. Each tool
 you listed is described in the [tool reference](../reference/tools.md), with the scope it needs.
 
 You now have a working local server, and you have seen the full path a request takes: token check,

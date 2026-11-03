@@ -1,8 +1,7 @@
-"""Implementation-neutral harness for the behavior parity suite.
+"""Black-box harness for the behavior suite.
 
 Every test in ``tests/parity`` talks to the service only through HTTP and the audit journal, so the
-same assertions can run against any server implementation. ``IMPLEMENTATIONS`` is the registry: the
-FastMCP migration (plan Task 4) adds its builder here, and every parity test then runs against it.
+assertions describe the public contract and survive any change of framework internals.
 """
 
 from __future__ import annotations
@@ -10,7 +9,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -21,10 +20,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from starlette.testclient import TestClient
 from starlette.types import ASGIApp
 
-from stram_quant_mcp.auth import CallableKeyResolver, JWTTokenVerifier, JWTVerifierConfig
 from stram_quant_mcp.fastmcp_auth import StrictVerifier
 from stram_quant_mcp.fastmcp_server import create_fastmcp_application
-from stram_quant_mcp.server import create_application
 from stram_quant_mcp.settings import AppSettings
 from stram_quant_mcp.tool_registry import TOOL_SPECS
 
@@ -38,24 +35,13 @@ TOKEN_LIFETIME_SECONDS = 300
 ACCEPT = "application/json, text/event-stream"
 LAKE = Path(__file__).parents[1] / "fixtures/lake"
 
-ImplementationBuilder = Callable[[AppSettings, "TokenMinter", bytes], ASGIApp]
 
-
-def build_sdk(settings: AppSettings, minter: TokenMinter, audit_key: bytes) -> ASGIApp:
-    """Build the hand-wired official-SDK implementation."""
-
-    return create_application(settings, token_verifier=minter.verifier(), audit_key=audit_key).app
-
-
-def build_fastmcp(settings: AppSettings, minter: TokenMinter, audit_key: bytes) -> ASGIApp:
-    """Build the FastMCP implementation, trusting only the minter's key."""
+def build_service(settings: AppSettings, minter: TokenMinter, audit_key: bytes) -> ASGIApp:
+    """Build the service, trusting only the minter's key."""
 
     verifier = StrictVerifier(settings, public_key=minter.public_key_pem())
     built = create_fastmcp_application(settings, token_verifier=verifier, audit_key=audit_key)
     return built.app
-
-
-IMPLEMENTATIONS: dict[str, ImplementationBuilder] = {"sdk": build_sdk, "fastmcp": build_fastmcp}
 
 
 class TokenMinter:
@@ -71,14 +57,6 @@ class TokenMinter:
         return self.key.public_key().public_bytes(
             serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
         )
-
-    def verifier(self) -> JWTTokenVerifier:
-        """Return the production verifier configured to trust only this minter's key."""
-
-        config = JWTVerifierConfig(
-            issuer=ISSUER, audience=RESOURCE, tenant_id=TENANT, leeway_seconds=0
-        )
-        return JWTTokenVerifier(config, CallableKeyResolver(lambda _token: self.key.public_key()))
 
     def mint(
         self,
@@ -123,7 +101,7 @@ class Reply:
 
 
 class ParityClient:
-    """Sends JSON-RPC requests to the implementation under test."""
+    """Sends JSON-RPC requests to the service under test."""
 
     def __init__(self, client: TestClient, minter: TokenMinter, audit_db: Path) -> None:
         self._client = client

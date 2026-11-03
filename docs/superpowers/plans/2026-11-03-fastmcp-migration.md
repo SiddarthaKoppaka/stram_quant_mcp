@@ -174,8 +174,7 @@ Findings made while building, now covered by tests:
 
 ## Task 5: Switch and rollback (code done; live switch pending)
 
-`app.create_from_env` runs FastMCP by default; `STRAM_MCP_SERVER_IMPLEMENTATION=sdk` selects the previous
-server. The staging acceptance runner passes against both servers over real TLS, and the official MCP client
-completes a session against FastMCP. Not done, because it needs authorization: building and approving the
-image digest, running staging acceptance against the real Keycloak and lake, and deleting the previous
-server. See [how to switch](../../how-to/switch-server-implementation.md).
+`app.create_from_env` builds the FastMCP server. The staging acceptance runner passes over real TLS, and the
+official MCP client completes a session. The previous server was then deleted (after the user's decision) and
+kept on the `archive/sdk-server` branch. Not done, because it needs authorization: building and approving the
+image digest and running staging acceptance against the real Keycloak and lake.

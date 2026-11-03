@@ -1,4 +1,4 @@
-"""The public tool contract every implementation must preserve exactly."""
+"""The public tool contract the service must preserve exactly."""
 
 from __future__ import annotations
 

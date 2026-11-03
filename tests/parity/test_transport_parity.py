@@ -1,4 +1,4 @@
-"""Transport and token behavior every implementation must share."""
+"""Transport and token behavior the service must keep."""
 
 from __future__ import annotations
 
@@ -49,6 +49,13 @@ def test_resource_metadata_names_the_resource_and_the_issuer(parity: ParityClien
     assert document["resource"] == RESOURCE
     assert document["authorization_servers"] == [ISSUER]
     assert document["bearer_methods_supported"] == ["header"]
+    assert document["scopes_supported"] == list(ALL_SCOPES)
+
+
+def test_advertising_scopes_does_not_demand_them_at_the_transport(parity: ParityClient) -> None:
+    token = parity.minter.mint("quant:discover")
+
+    assert parity.rpc("initialize", INITIALIZE, token=token).status == 200
 
 
 @pytest.mark.parametrize("case", sorted(BAD_TOKEN_CASES))

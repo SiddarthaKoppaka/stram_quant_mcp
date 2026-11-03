@@ -31,7 +31,6 @@ truth is [`settings.py`](../../src/stram_quant_mcp/settings.py).
 | `STRAM_MCP_WORKER_SHUTDOWN_SECONDS` | `5` | Drain budget on shutdown |
 | `STRAM_MCP_DENIAL_LIMIT` | `5` | Denied calls inside the window after which a caller is blocked |
 | `STRAM_MCP_DENIAL_WINDOW_SECONDS` | `60` | Length of the sliding window for counting denials |
-| `STRAM_MCP_SERVER_IMPLEMENTATION` | `fastmcp` | `fastmcp`, or `sdk` to run the previous server; see [how to switch](../how-to/switch-server-implementation.md) |
 | `STRAM_MCP_BIND_HOST` | `127.0.0.1` | `127.0.0.1` or `0.0.0.0` (container only) |
 | `STRAM_MCP_BIND_PORT` | `8000` | Listen port, 1 to 65535 |
 

@@ -20,7 +20,6 @@ so you can find what you need by asking what you are trying to do.
 - [Set up and connect a client](how-to/set-up-and-connect-a-client.md)
 - [Run the quality gates](how-to/run-the-quality-gates.md)
 - [Add a tool](how-to/add-a-tool.md)
-- [Switch the server implementation](how-to/switch-server-implementation.md)
 - [Provision the Qual MCP Keycloak clients](how-to/provision-qual-clients.md)
 - [Apply the OAuth discovery routes](how-to/apply-discovery-routes.md)
 - [Operate the service](how-to/operate-the-service.md): the full runbook for staging, recovery and rollback.

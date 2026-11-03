@@ -28,9 +28,10 @@ from stram_quant_mcp.fastmcp_middleware import (
     TelemetryMiddleware,
 )
 from stram_quant_mcp.fastmcp_tools import register_tools
+from stram_quant_mcp.http_boundary import HttpTelemetryMiddleware, TransportDenialAuditMiddleware
 from stram_quant_mcp.policy import InvocationService, RateLimiter
 from stram_quant_mcp.request_limits import BodyLimitMiddleware
-from stram_quant_mcp.server import HttpTelemetryMiddleware, Runtime, TransportDenialAuditMiddleware
+from stram_quant_mcp.runtime import Runtime
 from stram_quant_mcp.settings import AppSettings, load_secret_file
 from stram_quant_mcp.telemetry import Telemetry
 from stram_quant_mcp.version import __version__

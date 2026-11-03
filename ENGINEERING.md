@@ -150,10 +150,8 @@ nothing imports a private `stram_data` module. A new layer or an upward import n
   framework middleware or authorization checks, not copied into tool functions.
 - The framework version MUST NOT change without running the full contract and security suites and the
   tool-schema gate.
-- The previous SDK server stays selectable through `STRAM_MCP_SERVER_IMPLEMENTATION=sdk` only as a
-  rollback aid. Owner: the maintainer who approves the FastMCP release. Removal condition: the FastMCP
-  release has passed M6 staging acceptance against the real identity provider and lake. Expiry: it is
-  deleted, with the old registry-free server code and its tests, in the first release after that.
+- The previous SDK server was removed with its selection switch. Its last working state is the
+  `archive/sdk-server` branch; to roll back, deploy an image built from that branch.
 
 ## 4. MCP tool contract rules
 

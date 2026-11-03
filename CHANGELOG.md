@@ -2,8 +2,8 @@
 
 ## Unreleased — FastMCP server
 
-- Replaces the hand-wired SDK server with a FastMCP 4.1.6 server by default. The ten tool names, closed
-  schemas, scopes and schema hashes are unchanged; a black-box parity suite runs against both servers.
+- Replaces the hand-wired SDK server with a FastMCP 4.1.6 server. The ten tool names, closed
+  schemas, scopes and schema hashes are unchanged; a black-box behavior suite pins them.
 - Every tool call is re-authorized against a default-deny policy store, tools a caller cannot use are
   hidden from `tools/list`, and a caller who keeps being denied is blocked.
 - Denied calls now reply `Access denied.` and error replies carry a `retryable` flag in `_meta`.
@@ -11,7 +11,8 @@
 - Verifies tokens with a strict FastMCP verifier behind the Keycloak provider, and refuses to become
   ready until the JWKS endpoint serves a key.
 - Documentation is reorganised into tutorials, how-to guides, reference and explanation.
-- `STRAM_MCP_SERVER_IMPLEMENTATION=sdk` selects the previous server as a temporary rollback aid.
+- Removes the hand-wired SDK server and its `STRAM_MCP_SERVER_IMPLEMENTATION` switch. The old code is kept
+  on the `archive/sdk-server` branch.
 
 ## 0.1.0 release candidate — 2026-11-01
 

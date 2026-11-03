@@ -4,9 +4,10 @@ This page explains why the server framework changed, what changed, what delibera
 the change was made safely. It records a decision; it is not a procedure. The step-by-step work is in
 the [implementation plan](../superpowers/plans/2026-11-03-fastmcp-migration.md).
 
-**Status:** the FastMCP server is implemented, is the default, and passes the same black-box parity
-suite as the previous server. It has not yet run against the real Keycloak and lake in staging. The
-previous server remains selectable as a rollback aid until it has.
+**Status:** the FastMCP server is implemented, is the default, and passes the same black-box
+behavior suite the previous server passed. It has not yet run against the real Keycloak and lake in
+staging. The previous server was removed; its last working state is the `archive/sdk-server` branch, from
+which a rollback image can be built.
 
 ## Why change
 

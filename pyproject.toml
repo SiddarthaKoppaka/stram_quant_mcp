@@ -96,10 +96,8 @@ convention = "google"
 # legacy baseline: violations that predate the rules. This list may only shrink (ENGINEERING.md 3.3).
 "src/stram_quant_mcp/app.py" = ["D103", "PLR2004"]
 "src/stram_quant_mcp/audit.py" = ["D101", "D102", "D103", "D107", "D202", "PLR2004"]
-"src/stram_quant_mcp/auth.py" = ["D101", "D102", "D107", "PLR0911", "PLR2004"]
 "src/stram_quant_mcp/entrypoint.py" = ["D103", "D202", "PLR2004"]
 "src/stram_quant_mcp/policy.py" = ["D102", "D107", "PLR0913"]
-"src/stram_quant_mcp/server.py" = ["D101", "D102", "D107", "D202", "PLR0915", "PLR2004"]
 "src/stram_quant_mcp/settings.py" = ["D102", "D202", "PLR2004"]
 "src/stram_quant_mcp/telemetry.py" = ["D102", "D103", "D107", "D202", "PLR0913"]
 "src/stram_quant_mcp/tool_adapter.py" = ["D102", "D107"]
@@ -141,10 +139,11 @@ layers = [
   "entrypoint",
   "app",
   "fastmcp_server",
-  "server",
   "fastmcp_tools | fastmcp_middleware | fastmcp_auth",
   "fastmcp_audit",
-  "policy | auth | access_policy | denial_throttle",
+  "http_boundary",
+  "runtime",
+  "policy | access_policy | denial_throttle",
   "worker",
   "tool_adapter",
   "tool_registry",

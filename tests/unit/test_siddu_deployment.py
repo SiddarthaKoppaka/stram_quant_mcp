@@ -22,10 +22,8 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from stram_quant_mcp.audit import AuditJournal
-from stram_quant_mcp.auth import CallableKeyResolver, JWTTokenVerifier, JWTVerifierConfig
 from stram_quant_mcp.fastmcp_auth import StrictVerifier
 from stram_quant_mcp.fastmcp_server import create_fastmcp_application
-from stram_quant_mcp.server import create_application
 from stram_quant_mcp.settings import AppSettings
 from tools import keycloak_negative_tokens, staging_acceptance
 
@@ -33,6 +31,13 @@ ROOT = Path(__file__).parents[2]
 INSTALLER = ROOT / "deploy/stram_quant_siddu.sh"
 COMPLETION = ROOT / "deploy/complete_siddu_staging.sh"
 REALM = ROOT / "deploy/keycloak/stram-staging-realm.json"
+
+
+def _strict_verifier(settings: AppSettings, private_key: rsa.RSAPrivateKey) -> StrictVerifier:
+    public_pem = private_key.public_key().public_bytes(
+        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    return StrictVerifier(settings, public_key=public_pem)
 
 
 def _free_port() -> int:
@@ -181,10 +186,7 @@ def test_siddu_installer_includes_egress_seccomp_audit_backup_and_rollback_steps
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-@pytest.mark.parametrize("implementation", ["sdk", "fastmcp"])
-async def test_staging_acceptance_verifier_passes_end_to_end_over_https(
-    tmp_path: Path, implementation: str
-) -> None:
+async def test_staging_acceptance_verifier_passes_end_to_end_over_https(tmp_path: Path) -> None:
     idp_port = _free_port()
     mcp_port = _free_port()
     issuer = f"https://localhost:{idp_port}/realms/stram-staging"
@@ -267,25 +269,9 @@ async def test_staging_acceptance_verifier_passes_end_to_end_over_https(
         allow_insecure_http=False,
         image_digest="sha256:" + "a" * 64,
     )
-    verifier = JWTTokenVerifier(
-        JWTVerifierConfig(
-            issuer=issuer,
-            audience=resource,
-            tenant_id="local-stram",
-            leeway_seconds=0,
-        ),
-        CallableKeyResolver(lambda _token: private_key.public_key()),
-    )
-    if implementation == "fastmcp":
-        public_pem = private_key.public_key().public_bytes(
-            serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
-        )
-        fast_verifier = StrictVerifier(settings, public_key=public_pem)
-        served_app = create_fastmcp_application(
-            settings, token_verifier=fast_verifier, audit_key=audit_key
-        ).app
-    else:
-        served_app = create_application(settings, token_verifier=verifier, audit_key=audit_key).app
+    served_app = create_fastmcp_application(
+        settings, token_verifier=_strict_verifier(settings, private_key), audit_key=audit_key
+    ).app
 
     idp_server = uvicorn.Server(
         uvicorn.Config(
@@ -545,16 +531,9 @@ async def test_staging_acceptance_against_real_stock_lake_readonly(tmp_path: Pat
         allow_insecure_http=False,
         image_digest="sha256:" + "b" * 64,
     )
-    verifier = JWTTokenVerifier(
-        JWTVerifierConfig(
-            issuer=issuer,
-            audience=resource,
-            tenant_id="local-stram",
-            leeway_seconds=0,
-        ),
-        CallableKeyResolver(lambda _token: private_key.public_key()),
+    built = create_fastmcp_application(
+        settings, token_verifier=_strict_verifier(settings, private_key), audit_key=audit_key
     )
-    built = create_application(settings, token_verifier=verifier, audit_key=audit_key)
 
     idp_server = uvicorn.Server(
         uvicorn.Config(
