@@ -7,10 +7,12 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import cast
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.provider import TokenVerifier
+from mcp.server.auth.routes import build_resource_metadata_url, create_protected_resource_routes
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.context import ServerRequestContext
 from mcp.server.lowlevel import Server
@@ -27,6 +29,7 @@ from mcp.types import (
 from opentelemetry import propagate
 from opentelemetry.trace import SpanKind
 from pydantic import JsonValue
+from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
@@ -217,8 +220,27 @@ def create_application(
         token_verifier=verifier,
         custom_starlette_routes=routes,
     )
+    _advertise_supported_scopes(starlette, settings)
     app = HttpTelemetryMiddleware(TransportDenialAuditMiddleware(starlette, runtime), runtime)
     return BuiltApplication(app=app, server=server, runtime=runtime)
+
+
+def _advertise_supported_scopes(starlette: Starlette, settings: AppSettings) -> None:
+    """Publish supported scopes in RFC 9728 metadata without enforcing them at transport.
+
+    The SDK derives ``scopes_supported`` from ``required_scopes``, which would demand every scope
+    on every request. Per-tool scope enforcement stays in the policy layer.
+    """
+
+    path = urlparse(str(build_resource_metadata_url(settings.resource_url))).path
+    replacement = create_protected_resource_routes(
+        resource_url=settings.resource_url,
+        authorization_servers=[settings.issuer_url],
+        scopes_supported=sorted({spec.scope for spec in TOOL_SPECS}),
+    )
+    routes = starlette.router.routes
+    index = next(i for i, r in enumerate(routes) if getattr(r, "path", None) == path)
+    routes[index : index + 1] = replacement
 
 
 def _wire_tools() -> list[Tool]:
@@ -375,7 +397,7 @@ def _route_path(scope: Scope) -> str:
 
 
 def _telemetry_outcome(error: QuantToolError) -> str:
-    if error.code in {"forbidden"}:
+    if error.code in {"access_denied"}:
         return "denied"
     if error.code in {"overloaded", "deadline_exceeded"}:
         return "overloaded"

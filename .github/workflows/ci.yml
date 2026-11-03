@@ -35,6 +35,8 @@ jobs:
         run: uv run pytest --cov --cov-report=term-missing
       - name: Type check
         run: uv run mypy
+      - name: Import boundaries
+        run: uv run lint-imports
       - name: Lint and format
         run: uv run ruff check . && uv run ruff format --check .
       - name: Contract and schema drift
@@ -46,7 +48,7 @@ jobs:
       - name: Secret gate
         run: >-
           uv run detect-secrets scan --all-files
-          --exclude-files '(^|/)(\.git|\.venv|\.mypy_cache|\.pytest_cache|\.ruff_cache|build|contracts|tests/fixtures|uv\.lock)(/|$)'
+          --exclude-files '(^|/)(\.git|\.venv|\.mypy_cache|\.pytest_cache|\.ruff_cache|\.grimp_cache|\.import_linter_cache|build|contracts|tests/fixtures|uv\.lock)(/|$)'
           | uv run python tools/check_secret_scan.py
       - name: License gate
         run: uv run pip-licenses --format=json | uv run python tools/check_licenses.py

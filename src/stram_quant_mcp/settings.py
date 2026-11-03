@@ -34,6 +34,9 @@ class AppSettings(BaseModel):
     worker_restart_backoff_seconds: float = Field(default=0.25, ge=0, le=10)
     worker_shutdown_seconds: float = Field(default=5.0, gt=0, le=30)
     rate_limit_per_minute: int = Field(default=30, ge=1, le=1000)
+    denial_limit: int = Field(default=5, ge=1, le=100)
+    denial_window_seconds: float = Field(default=60.0, gt=0, le=3600)
+    max_denial_principals: int = Field(default=1000, ge=1, le=100_000)
     max_rate_principals: int = Field(default=1000, ge=1, le=100_000)
     allow_insecure_http: bool = False
     image_digest: str = Field(default="development", max_length=200)
@@ -96,6 +99,8 @@ class AppSettings(BaseModel):
             "worker_max_restarts": "STRAM_MCP_WORKER_MAX_RESTARTS",
             "worker_restart_backoff_seconds": "STRAM_MCP_WORKER_RESTART_BACKOFF_SECONDS",
             "worker_shutdown_seconds": "STRAM_MCP_WORKER_SHUTDOWN_SECONDS",
+            "denial_limit": "STRAM_MCP_DENIAL_LIMIT",
+            "denial_window_seconds": "STRAM_MCP_DENIAL_WINDOW_SECONDS",
         }
         values.update(
             {

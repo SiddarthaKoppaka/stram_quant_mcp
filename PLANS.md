@@ -108,10 +108,104 @@ Prepared on branch `feat/m6-siddu-local-keycloak` over baseline `d19133350dfba39
 
 - Consolidated operator workflow in [`deploy/stram_quant_siddu.sh`](deploy/stram_quant_siddu.sh) preserving `prepare`, `activate` and `status` compatibility while adding `doctor`, `auth-prepare`, `auth-start`, `auth-verify`, `verify`, `backup-audit` and `rollback`.
 - Segregated `stram-auth` rootless Podman Quadlet design (`stram-keycloak-db.container` and `stram-keycloak.container`) on an `--internal` Podman network with digest-pinned PostgreSQL 17 and optimized Keycloak 26 (`start --optimized --import-realm`, no `start-dev`), Podman secret injection (`KCRAW_DB_PASSWORD`, client secrets, bootstrap password), and loopback-only publication (`127.0.0.1:9080` and `127.0.0.1:9001`).
+
+Deployment reconciliation on 2026-11-01 found that the earlier reported `101 passed` result did not
+match the current pinned Data Interface: the live acceptance fixture treated tuple catalog results as
+objects, used obsolete result/date fields, attempted lineage on a non-derived event, supplied obsolete
+aligned-panel arguments, and used a discovery-scoped tool for the insufficient-scope denial. Those
+defects were corrected without changing any MCP schema or runtime source. The current full suite is
+**101 passed** with **86.84%** branch coverage; strict mypy, Ruff, schema, documentation, telemetry,
+secret and 103-package license gates pass. `pip-audit` reports no unreviewed finding and explicitly
+ignores the two aliases for the single documented PyArrow exception.
+
+Final local staging image evidence prepared before privileged activation:
+
+- Quant candidate: `sha256:97f7bec6de25f7ea37d483e059157b045789aa1718dfb4abe22a0572290f54f2`,
+  source revision `ea520857962051a8085dd2b353ecb3aeaa1e98da`, with one reviewed PyArrow
+  exception.
+- Optimized Keycloak 26.8.1: `sha256:139cfd66cafcf30598398d1d3f5f57d8389f83425ed9a97661470e49cd2f6f5b`,
+  based on official amd64 digest `sha256:de6ed510b59cfcd25f129ba4118696fa10d4165eee921a8d846178b6d35d30f7`,
+  with the time-bounded Guava CVE-2026-102554 exception.
+- Hardened PostgreSQL 17.11: `sha256:299e7819b8a60f9454b781b36539eaaa16d905f2cfed22086ffdee9b997d62e4`,
+  based on official digest `sha256:2cd2c0f809604aaeff6f0ec8f40aecbd025613107561015c69369a1a7f1d3416`;
+  removing the unused root-only `gosu` helper reduced the final HIGH/CRITICAL scan to zero findings.
+- CycloneDX image SBOMs, pinned-Trivy JSON scans, archive checksums and the unsigned local provenance
+  manifest are under ignored `build/m6/`. No registry signature or independent security approval is
+  claimed.
+
+The canonical installer now provisions the separate auth identity, imports immutable artifacts,
+installs persistent UID-scoped nftables egress, generates genuine temporary Keycloak-signed negative
+JWTs, generates real-lake calls solely through `stram_data.data_interface`, exercises live worker
+timeout/recovery, independently verifies audit backups/checkpoints, performs rollback plus approved
+image recovery, and adds boot persistence only after every live gate. A fail-closed one-step operator
+workflow is in `deploy/complete_siddu_staging.sh` so privileged work requires one terminal sudo
+authentication. Live execution remains pending until the tailnet owner enables Tailscale Serve and
+the operator performs that single terminal authentication; the three new services remain stopped.
 - Realm template [`deploy/keycloak/stram-staging-realm.json`](deploy/keycloak/stram-staging-realm.json) with `RS256`, 300s access tokens, confidential service-account clients (`stram-quant-smoke` and `stram-quant-discovery-only`), explicit audience mapper (`${STRAM_MCP_RESOURCE_URL}`), hardcoded `tenant_id` mapper (`${STRAM_MCP_TENANT_ID}`), and independent optional scopes (`quant:discover`, `quant:read`, `quant:lineage`, `quant:analytics`).
 - Online WAL-safe SQLite audit backup (`python -m stram_quant_mcp.audit backup`) with independent HMAC chain verification and host-signed external checkpointing in `backup-audit` and `rollback`.
 - Credential-safe staging acceptance runner [`tools/staging_acceptance.py`](tools/staging_acceptance.py) validating OIDC discovery/JWKS, positive token claims, negative JWT signatures/claims, Host (`421`) and Origin (`403`) denials, insufficient-scope tool denial, official MCP SDK session over HTTPS, worker seccomp filter count, and non-allowlisted DNS/IPv4/IPv6 egress denials.
 - No privileged host mutations, service activations, credential accesses, or lake modifications were executed; live activation remains gated on operator-approved private DNS/TLS routing, `stram-auth` user creation, host egress firewall rules, and immutable registry digests in `/etc/stram-quant/auth.env` and `/etc/stram-quant/m6-approval.env`.
+
+### Shared Keycloak, discovery routing and second-MCP clients (2026-11-02; steps 1-2 live, step 4 held)
+
+- Root cause of the failing OAuth discovery: the app already served RFC 9728 metadata and a correct 401
+  `WWW-Authenticate` challenge; Tailscale Serve on `:443` proxied only `/mcp` and `/realms`, so
+  `/.well-known/oauth-protected-resource/mcp` returned 404 (observed with a read-only request).
+- App change: `scopes_supported` now lists the `quant:*` scopes without making them transport-required
+  (the SDK would otherwise enforce them on every request). Audience, verifier, policy and Quant clients unchanged.
+- `deploy/stram_quant_siddu.sh discovery-routes {status|apply|remove}` adds/removes only the two `/.well-known/`
+  Serve handlers behind an explicit confirmation; `verify` reports them.
+- `tools/provision_qual_clients.py` idempotently provisions `stram-qual-claims` (audience
+  `https://siddu.tailc5da4c.ts.net:8443/mcp`, `tenant_id`), optional scopes `qual:discover|read|analytics|text`
+  and clients `stram-qual-smoke`, `stram-qual-text`, `stram-qual-discovery-only`. It refuses to touch non-Qual
+  clients, fails if any qual scope is a realm default, and verifies iss, aud, exp, iat, sub, tenant_id, azp and
+  that `qual:text` is never granted by default. Secrets are owner-only files and are never printed.
+- Acceptance runner now checks the 401 challenge, resource metadata and RFC 8414 server metadata.
+- Evidence: full suite passes with 86.92% branch coverage; Ruff, strict mypy, documentation and
+  detect-secrets gates pass. New unit tests use an in-memory Keycloak; no live Keycloak, Serve, credential or
+  port 8443 change was made.
+- Live evidence (operator-run with sudo): discovery routes applied; the protected-resource metadata URL
+  returns RFC 9728 JSON with the correct resource and issuer. Qual provisioning created five scopes and three
+  clients; a second run reported no drift and `--verify` passed (claims, audience isolation, `qual:text`
+  policy). Secret files are root-owned mode 0600 and were not read. Tenant `local-stram` and the four
+  `qual:*` scopes with the `:8443` audience were confirmed by the operator.
+- The running Quant image predates the `scopes_supported` change, so live metadata still shows `[]` until a
+  digest-approved image is deployed; clients can still discover the issuer.
+- Pending: secret handover to the qualitative team; the `:8443` Serve entry is held until Deepak confirms
+  the qualitative service uses the Keycloak issuer.
+- Remaining risks: token claims are checked unsigned in the provisioner (signature checks stay in the acceptance
+  runner); the second MCP's `tenant_id` is assumed to be `local-stram`; `:8443` stays inactive until the
+  other team confirms readiness; no commit was made.
+
+### M7 FastMCP migration (started 2026-11-03)
+
+- Decision: migrate the server framework to FastMCP, keeping every tool contract, the isolated worker, the
+  audit chain and the exact identity checks. Rationale and scope: [About the FastMCP migration](docs/explanation/about-the-fastmcp-migration.md).
+  Plan and spike result: [implementation plan](docs/superpowers/plans/2026-11-03-fastmcp-migration.md).
+- Rules first: `ENGINEERING.md` sections 3.1 to 3.4 add readability rules R1 to R16, import layers, a lint
+  baseline that may only shrink, framework rules, and Diataxis documentation rules. The rules are enforced by
+  Ruff (`C901`, `PLR*`, `D`, `N`, `ERA001`, `BLE001`) and `lint-imports`, and run in CI. Legacy code is not
+  refactored; its existing violations are the baseline in `pyproject.toml`.
+- Documentation was restructured into tutorials, how-to, reference and explanation under `docs/` with an index.
+  `docs/how-to/operate-the-service.md` still mixes types and is queued to be split.
+- Spike (isolated environment, FastMCP 4.1.6): 17 of 17 checks pass with five conditions, notably a stricter
+  verifier (the stock one accepts a token with no `iat`) and masking of validation errors that otherwise leak
+  Pydantic internals. Dependencies added to the project so far: `import-linter` (development only).
+- Design decisions D1 to D7 (Keycloak provider with our strict verifier, hidden Pydantic validation, default-deny
+  per-call policy check, hidden unauthorized tools, `Access denied` not retryable, no server-side retry,
+  always-on Host/Origin protection) are recorded in the plan.
+- Task 2 done: 57 black-box parity tests pass on the current implementation and were shown to fail when the scope
+  check or Host/Origin protection is removed; four target-behavior tests wait for the FastMCP implementation.
+- Tasks 3 to 5 implemented in code (2026-11-03): `fastmcp==4.1.6` pinned (25 packages added, no existing
+  version changed, no known vulnerabilities, 130 licenses reviewed); nine new modules; default-deny policy store
+  with hidden tools; denial throttle; JWKS warm-up before readiness; `Access denied.` with `retryable` metadata;
+  request-body cap; FastMCP is the default in `app.py` with `STRAM_MCP_SERVER_IMPLEMENTATION=sdk` as a rollback
+  aid. The parity suite, the staging acceptance runner over real TLS and an official-client session pass against
+  FastMCP. Details: [implementation plan](docs/superpowers/plans/2026-11-03-fastmcp-migration.md).
+- Not done, needs separate authorization: build and scan the image, approve its digest, run staging acceptance
+  against the real Keycloak and lake, then remove the previous server (see ENGINEERING.md 3.4).
+- Behavior changes to communicate to clients: the denial message is now `Access denied.`; `tools/list` shows only
+  callable tools; repeated denials block the caller.
 
 ## 1. Verified knowledge transfer
 

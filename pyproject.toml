@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12,<3.15"
 license = { text = "Proprietary" }
 dependencies = [
+  "fastmcp==4.1.6",
   "mcp==2.3.0",
   "opentelemetry-exporter-otlp-proto-http>=1.45,<2",
   "opentelemetry-sdk>=1.45,<2",
@@ -25,6 +26,7 @@ stram-quant-mcp = "stram_quant_mcp.app:main"
 dev = [
   "cyclonedx-bom>=7,<8",
   "detect-secrets>=1.5,<2",
+  "import-linter>=2.0,<3",
   "mypy>=1.13,<2",
   "pip-audit>=2.9,<3",
   "pip-licenses>=5,<6",
@@ -63,10 +65,61 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "ASYNC", "S"]
+# Readability rules are specified in ENGINEERING.md section 3.1 (R1-R16).
+select = [
+  "E", "F", "I", "UP", "B", "SIM", "RUF", "ASYNC", "S",
+  "C901",     # R2 complexity
+  "PLR0915",  # R1 statements per function
+  "PLR0913",  # R3 parameters
+  "PLR0911",  # R3 return points
+  "PLR2004",  # R11 magic values
+  "ERA001",   # R9 commented-out code
+  "N",        # R10 naming
+  "BLE001",   # R12 blind except
+  "D",        # R8 docstrings
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-statements = 50
+max-args = 5
+max-returns = 6
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101"]
+# Tests are exempt from docstrings and magic-value rules (R8, R11).
+"tests/**/*.py" = ["S101", "D", "PLR2004"]
+# legacy baseline: violations that predate the rules. This list may only shrink (ENGINEERING.md 3.3).
+"src/stram_quant_mcp/app.py" = ["D103", "PLR2004"]
+"src/stram_quant_mcp/audit.py" = ["D101", "D102", "D103", "D107", "D202", "PLR2004"]
+"src/stram_quant_mcp/auth.py" = ["D101", "D102", "D107", "PLR0911", "PLR2004"]
+"src/stram_quant_mcp/entrypoint.py" = ["D103", "D202", "PLR2004"]
+"src/stram_quant_mcp/policy.py" = ["D102", "D107", "PLR0913"]
+"src/stram_quant_mcp/server.py" = ["D101", "D102", "D107", "D202", "PLR0915", "PLR2004"]
+"src/stram_quant_mcp/settings.py" = ["D102", "D202", "PLR2004"]
+"src/stram_quant_mcp/telemetry.py" = ["D102", "D103", "D107", "D202", "PLR0913"]
+"src/stram_quant_mcp/tool_adapter.py" = ["D102", "D107"]
+"src/stram_quant_mcp/tool_models.py" = ["D101", "D102", "PLR2004"]
+"src/stram_quant_mcp/tool_registry.py" = ["D102", "D202"]
+"src/stram_quant_mcp/tools/export_schema.py" = ["D103"]
+"src/stram_quant_mcp/worker.py" = ["BLE001", "D102", "D107", "D202", "PLR0913", "PLR2004"]
+"tests/unit/test_preflight.py" = ["PLR0913"]
+"tests/unit/test_qual_provisioning.py" = ["C901", "PLR0911"]
+"tests/unit/test_siddu_deployment.py" = ["PLR0915"]
+"tools/check_docs.py" = ["D103", "D202"]
+"tools/check_licenses.py" = ["D103"]
+"tools/check_secret_scan.py" = ["D103"]
+"tools/check_trivy_scan.py" = ["D103"]
+"tools/generate_staging_calls.py" = ["D103"]
+"tools/keycloak_negative_tokens.py" = ["C901", "D103", "PLR0913", "PLR2004"]
+"tools/provision_qual_clients.py" = ["C901", "D101", "D102", "D103", "D107", "D202", "PLR0913", "PLR2004"]
+"tools/staging_acceptance.py" = ["D101", "D103", "D202", "PLR2004"]
+"tools/verify_otel_fixture.py" = ["D101", "D102", "D103", "D107"]
+
 
 [tool.mypy]
 python_version = "3.12"
@@ -76,3 +129,31 @@ packages = ["stram_quant_mcp"]
 [[tool.mypy.overrides]]
 module = ["pyarrow", "pyarrow.*", "duckdb"]
 ignore_missing_imports = true
+
+[tool.importlinter]
+root_package = "stram_quant_mcp"
+
+[[tool.importlinter.contracts]]
+name = "Layers: a module imports only from layers beneath it (ENGINEERING.md 3.2)"
+type = "layers"
+containers = ["stram_quant_mcp"]
+layers = [
+  "entrypoint",
+  "app",
+  "fastmcp_server",
+  "server",
+  "fastmcp_tools | fastmcp_middleware | fastmcp_auth",
+  "fastmcp_audit",
+  "policy | auth | access_policy | denial_throttle",
+  "worker",
+  "tool_adapter",
+  "tool_registry",
+  "tool_models",
+  "settings | errors | request_context",
+]
+exhaustive = false
+
+[[tool.importlinter.contracts]]
+name = "Audit and telemetry are independent siblings"
+type = "independence"
+modules = ["stram_quant_mcp.audit", "stram_quant_mcp.telemetry"]

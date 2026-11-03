@@ -81,3 +81,34 @@ def test_health_is_public_but_readiness_tracks_lifespan(tmp_path) -> None:
         assert ready.json() == {"status": "ready"}
 
     assert built.runtime.ready is False
+
+
+def test_protected_resource_metadata_is_rfc9728_and_advertises_scopes(tmp_path) -> None:
+    built = create_application(
+        _settings(tmp_path), token_verifier=StaticVerifier(), audit_key=b"k" * 32
+    )
+    with TestClient(built.app, base_url="http://testserver") as client:
+        response = client.get("/.well-known/oauth-protected-resource/mcp")
+        unauthenticated = client.post("/mcp", json={})
+        discovery_only = client.post(
+            "/mcp", json={}, headers={"Authorization": "Bearer valid-test-token"}
+        )
+    body = response.json()
+    assert response.status_code == 200
+    assert body["resource"] == "http://testserver/mcp"
+    assert body["authorization_servers"] == ["http://testserver/issuer"]
+    assert body["scopes_supported"] == [
+        "quant:analytics",
+        "quant:discover",
+        "quant:lineage",
+        "quant:read",
+    ]
+    assert body["bearer_methods_supported"] == ["header"]
+    challenge = unauthenticated.headers["www-authenticate"]
+    assert unauthenticated.status_code == 401
+    assert (
+        'resource_metadata="http://testserver/.well-known/oauth-protected-resource/mcp"'
+        in challenge
+    )
+    # Advertising scopes must not demand them at the transport: a discovery-only token passes auth.
+    assert discovery_only.status_code != 401

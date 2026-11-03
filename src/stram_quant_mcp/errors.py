@@ -26,10 +26,10 @@ class ToolNotFoundError(QuantToolError):
 
 
 class ToolForbiddenError(QuantToolError):
-    """The authenticated principal lacks this tool's required scope."""
+    """The caller has no grant for this tool; never retryable."""
 
-    code = "forbidden"
-    public_message = "The caller is not authorized to invoke this tool."
+    code = "access_denied"
+    public_message = "Access denied."
 
 
 class ToolUnavailableError(QuantToolError):

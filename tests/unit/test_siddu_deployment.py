@@ -15,6 +15,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
+from pydantic import AnyHttpUrl
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -22,12 +23,15 @@ from starlette.routing import Route
 
 from stram_quant_mcp.audit import AuditJournal
 from stram_quant_mcp.auth import CallableKeyResolver, JWTTokenVerifier, JWTVerifierConfig
+from stram_quant_mcp.fastmcp_auth import StrictVerifier
+from stram_quant_mcp.fastmcp_server import create_fastmcp_application
 from stram_quant_mcp.server import create_application
 from stram_quant_mcp.settings import AppSettings
-from tools import staging_acceptance
+from tools import keycloak_negative_tokens, staging_acceptance
 
 ROOT = Path(__file__).parents[2]
 INSTALLER = ROOT / "deploy/stram_quant_siddu.sh"
+COMPLETION = ROOT / "deploy/complete_siddu_staging.sh"
 REALM = ROOT / "deploy/keycloak/stram-staging-realm.json"
 
 
@@ -71,6 +75,7 @@ def _write_self_signed_tls(tmp_path: Path) -> tuple[Path, Path]:
 def test_siddu_installer_is_valid_and_keeps_activation_gates() -> None:
     # The executable and reviewed repository path are fixed test inputs.
     subprocess.run(["/usr/bin/bash", "-n", str(INSTALLER)], check=True)  # noqa: S603
+    subprocess.run(["/usr/bin/bash", "-n", str(COMPLETION)], check=True)  # noqa: S603
     text = INSTALLER.read_text()
 
     assert "start-dev" not in text
@@ -80,8 +85,14 @@ def test_siddu_installer_is_valid_and_keeps_activation_gates() -> None:
     assert "APPROVED_IMAGE_REF" in text
     assert "ROLLBACK_IMAGE_REF" in text
     assert "PublishPort=127.0.0.1:8800:8000" in text
+    assert "AddHost=$MCP_ALLOWED_HOSTS:$PRIVATE_HOST_IPV4" in text
+    assert "HealthCmd=/usr/bin/pg_isready" in text
     assert '--internal "$AUTH_NETWORK"' in text
     assert "Volume=$LAKE:/lake:ro,nosuid,nodev,noexec" in text
+    assert "Ulimit=stack=2097152:2097152" in text
+    assert "PodmanArgs=--cpus=2" in text
+    assert "Environment=MALLOC_ARENA_MAX=2" in text
+    assert "Environment=GLIBC_TUNABLES=glibc.malloc.arena_max=2" in text
     assert "--entrypoint /opt/venv/bin/python" in text
 
 
@@ -133,13 +144,23 @@ def test_siddu_installer_rejects_drift_and_placeholder_configs() -> None:
     for action in (
         "doctor",
         "prepare",
+        "provision-auth",
+        "import-images",
         "auth-prepare",
+        "install-egress",
         "auth-start",
         "auth-verify",
+        "prepare-acceptance",
         "activate",
         "verify",
+        "reliability-drill",
         "backup-audit",
+        "verify-backup",
+        "install-backup-timer",
         "rollback",
+        "restore-approved",
+        "enable-services",
+        "discovery-routes",
         "status",
     ):
         assert f"{action})" in text
@@ -160,7 +181,10 @@ def test_siddu_installer_includes_egress_seccomp_audit_backup_and_rollback_steps
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_staging_acceptance_verifier_passes_end_to_end_over_https(tmp_path: Path) -> None:
+@pytest.mark.parametrize("implementation", ["sdk", "fastmcp"])
+async def test_staging_acceptance_verifier_passes_end_to_end_over_https(
+    tmp_path: Path, implementation: str
+) -> None:
     idp_port = _free_port()
     mcp_port = _free_port()
     issuer = f"https://localhost:{idp_port}/realms/stram-staging"
@@ -215,6 +239,7 @@ async def test_staging_acceptance_verifier_passes_end_to_end_over_https(tmp_path
     idp_app = Starlette(
         routes=[
             Route("/realms/stram-staging/.well-known/openid-configuration", discovery),
+            Route("/.well-known/oauth-authorization-server/realms/stram-staging", discovery),
             Route("/realms/stram-staging/protocol/openid-connect/certs", jwks_endpoint),
             Route(
                 "/realms/stram-staging/protocol/openid-connect/token",
@@ -234,9 +259,9 @@ async def test_staging_acceptance_verifier_passes_end_to_end_over_https(tmp_path
         parquet_root=ROOT / "tests/fixtures/lake",
         audit_db_path=audit_db,
         audit_key_path=audit_key_file,
-        issuer_url=issuer,
-        resource_url=resource,
-        jwks_url=jwks_url,
+        issuer_url=AnyHttpUrl(issuer),
+        resource_url=AnyHttpUrl(resource),
+        jwks_url=AnyHttpUrl(jwks_url),
         tenant_id="local-stram",
         allowed_hosts=(f"localhost:{mcp_port}",),
         allow_insecure_http=False,
@@ -251,7 +276,16 @@ async def test_staging_acceptance_verifier_passes_end_to_end_over_https(tmp_path
         ),
         CallableKeyResolver(lambda _token: private_key.public_key()),
     )
-    built = create_application(settings, token_verifier=verifier, audit_key=audit_key)
+    if implementation == "fastmcp":
+        public_pem = private_key.public_key().public_bytes(
+            serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+        fast_verifier = StrictVerifier(settings, public_key=public_pem)
+        served_app = create_fastmcp_application(
+            settings, token_verifier=fast_verifier, audit_key=audit_key
+        ).app
+    else:
+        served_app = create_application(settings, token_verifier=verifier, audit_key=audit_key).app
 
     idp_server = uvicorn.Server(
         uvicorn.Config(
@@ -266,7 +300,7 @@ async def test_staging_acceptance_verifier_passes_end_to_end_over_https(tmp_path
     )
     mcp_server = uvicorn.Server(
         uvicorn.Config(
-            built.app,
+            served_app,
             host="127.0.0.1",
             port=mcp_port,
             ssl_certfile=str(cert_path),
@@ -312,6 +346,28 @@ async def test_staging_acceptance_verifier_passes_end_to_end_over_https(tmp_path
         )
         (neg_dir / f"{name}.jwt").write_text(token)
 
+    from stram_data.data_interface import DataInterface, DerivedQuery
+
+    interface = DataInterface(parquet_root=ROOT / "tests/fixtures/lake")
+    catalog = interface.get_catalog(limit=1)
+    assert catalog
+    first_observation = catalog[0].first_observation
+    indicators = interface.list_indicators()
+    assert indicators
+    indicator = indicators[0]
+    subjects = interface.list_indicator_subjects(indicator.indicator_id)
+    derived = interface.get_derived(
+        DerivedQuery(
+            indicator_id=indicator.indicator_id,
+            subject=subjects[0] if subjects else None,
+            start_date=indicator.first_observation,
+            end_date=indicator.first_observation,
+            limit=1,
+        )
+    )
+    assert derived.rows
+    event_id = str(derived.rows[0].event_id)
+
     calls_file = tmp_path / "calls.json"
     calls_file.write_text(
         json.dumps(
@@ -322,15 +378,15 @@ async def test_staging_acceptance_verifier_passes_end_to_end_over_https(tmp_path
                     {
                         "class": "lineage",
                         "tool": "quant_get_lineage",
-                        "arguments": {"event_id": "00000000-0000-0000-0000-000000000001"},
+                        "arguments": {"event_id": event_id},
                     },
                     {
                         "class": "analytics",
                         "tool": "quant_get_aligned_panel",
                         "arguments": {
-                            "series_keys": ["SPY"],
-                            "start": "2026-10-01",
-                            "end": "2026-10-02",
+                            "columns": [{"name": "sample", "series_key": catalog[0].series_key}],
+                            "start_date": str(first_observation),
+                            "end_date": str(first_observation),
                             "availability": "strict",
                             "limit": 5,
                         },
@@ -389,23 +445,29 @@ async def test_staging_acceptance_against_real_stock_lake_readonly(tmp_path: Pat
     if not (real_lake / "_manifests/economic_observation/_active.json").is_file():
         pytest.skip("canonical real Stock lake is not mounted in this environment")
 
-    from stram_data.data_interface import DataInterface, SeriesQuery
+    from stram_data.data_interface import DataInterface, DerivedQuery
 
     interface = DataInterface(parquet_root=real_lake)
     catalog = interface.get_catalog(limit=5)
-    assert catalog.entries
-    series_key = catalog.entries[0].series_key
-    sample = interface.get_series(
-        SeriesQuery(
-            series_keys=[series_key],
-            start_date="2020-01-01",
-            end_date="2026-11-01",
+    assert catalog
+    series_key = catalog[0].series_key
+    first_observation = catalog[0].first_observation
+    indicators = interface.list_indicators()
+    assert indicators
+    indicator = indicators[0]
+    subjects = interface.list_indicator_subjects(indicator.indicator_id)
+    derived = interface.get_derived(
+        DerivedQuery(
+            indicator_id=indicator.indicator_id,
+            subject=subjects[0] if subjects else None,
+            start_date=indicator.first_observation,
+            end_date=indicator.first_observation,
             limit=1,
         )
     )
-    assert sample.observations
-    event_id = str(sample.observations[0].event_id)
-    obs_date = str(sample.observations[0].observation_date)
+    assert derived.rows
+    event_id = str(derived.rows[0].event_id)
+    obs_date = str(first_observation)
 
     idp_port = _free_port()
     mcp_port = _free_port()
@@ -455,6 +517,7 @@ async def test_staging_acceptance_against_real_stock_lake_readonly(tmp_path: Pat
     idp_app = Starlette(
         routes=[
             Route("/realms/stram-staging/.well-known/openid-configuration", discovery),
+            Route("/.well-known/oauth-authorization-server/realms/stram-staging", discovery),
             Route("/realms/stram-staging/protocol/openid-connect/certs", jwks_endpoint),
             Route(
                 "/realms/stram-staging/protocol/openid-connect/token",
@@ -474,9 +537,9 @@ async def test_staging_acceptance_against_real_stock_lake_readonly(tmp_path: Pat
         parquet_root=real_lake,
         audit_db_path=audit_db,
         audit_key_path=audit_key_file,
-        issuer_url=issuer,
-        resource_url=resource,
-        jwks_url=jwks_url,
+        issuer_url=AnyHttpUrl(issuer),
+        resource_url=AnyHttpUrl(resource),
+        jwks_url=AnyHttpUrl(jwks_url),
         tenant_id="local-stram",
         allowed_hosts=(f"localhost:{mcp_port}",),
         allow_insecure_http=False,
@@ -567,9 +630,9 @@ async def test_staging_acceptance_against_real_stock_lake_readonly(tmp_path: Pat
                         "class": "analytics",
                         "tool": "quant_get_aligned_panel",
                         "arguments": {
-                            "series_keys": [series_key],
-                            "start": obs_date,
-                            "end": obs_date,
+                            "columns": [{"name": "sample", "series_key": series_key}],
+                            "start_date": obs_date,
+                            "end_date": obs_date,
                             "availability": "strict",
                             "limit": 5,
                         },
@@ -608,3 +671,158 @@ async def test_staging_acceptance_against_real_stock_lake_readonly(tmp_path: Pat
         mcp_server.should_exit = True
         idp_server.should_exit = True
         await asyncio.wait_for(asyncio.gather(mcp_task, idp_task), timeout=10)
+
+
+def test_keycloak_client_secret_reconciliation_is_idempotent_and_scoped(
+    tmp_path: Path,
+) -> None:
+    import base64
+    from urllib.parse import parse_qs, unquote_plus
+
+    import httpx2
+
+    bad_secret = tmp_path / "bad.secret"
+    bad_secret.write_text("unsafe+secret/with=chars" * 2 + "\n")
+    bad_secret.chmod(0o400)
+    with pytest.raises(RuntimeError, match="URL-safe base64") as exc_info:
+        keycloak_negative_tokens._urlsafe_secret(bad_secret)
+    assert "unsafe+secret" not in str(exc_info.value)
+
+    smoke_value = "A" * 32 + "-_" + "b" * 30
+    disc_value = "C" * 32 + "_-" + "d" * 30
+    smoke_file = tmp_path / "smoke.secret"
+    smoke_file.write_text(smoke_value + "\n")
+    smoke_file.chmod(0o400)
+    disc_file = tmp_path / "disc.secret"
+    disc_file.write_text(disc_value + "\n")
+    disc_file.chmod(0o400)
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    realm_template = json.loads(REALM.read_text())
+    template_clients = {c["clientId"]: c for c in realm_template["clients"]}
+
+    stored_clients: dict[str, dict[str, object]] = {
+        "uuid-smoke": {
+            **template_clients["stram-quant-smoke"],
+            "id": "uuid-smoke",
+            "secret": "legacy+secret/with+plus==" + "x" * 40,  # pragma: allowlist secret
+        },
+        "uuid-disc": {
+            **template_clients["stram-quant-discovery-only"],
+            "id": "uuid-disc",
+            "secret": disc_value,
+        },
+        "uuid-other": {
+            "id": "uuid-other",
+            "clientId": "stram-unrelated-client",
+            "secret": "untouched-secret",  # pragma: allowlist secret
+            "optionalClientScopes": [],
+        },
+    }
+    put_calls: list[str] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        path = request.url.path
+        if request.method == "GET" and path == "/admin/realms/stram-staging/clients":
+            cid = request.url.params.get("clientId")
+            matches = [
+                {k: v for k, v in item.items() if k != "secret"}
+                for item in stored_clients.values()
+                if item.get("clientId") == cid or cid == "stram-quant-smoke"
+            ]
+            return httpx2.Response(200, json=matches)
+        if request.method == "GET" and path.endswith("/client-secret"):
+            uuid = path.split("/")[-2]
+            return httpx2.Response(
+                200,
+                json={"type": "secret", "value": stored_clients[uuid]["secret"]},
+            )
+        if request.method == "PUT" and path.startswith("/admin/realms/stram-staging/clients/"):
+            uuid = path.split("/")[-1]
+            put_calls.append(uuid)
+            body = json.loads(request.content.decode())
+            stored_clients[uuid]["secret"] = body["secret"]
+            return httpx2.Response(204)
+        if (
+            request.method == "POST"
+            and path == "/realms/stram-staging/protocol/openid-connect/token"
+        ):
+            auth_hdr = request.headers.get("Authorization", "")
+            raw = base64.b64decode(auth_hdr.removeprefix("Basic ")).decode()
+            cid_raw, secret_raw = raw.split(":", 1)
+            cid, decoded_secret = unquote_plus(cid_raw), unquote_plus(secret_raw)
+            client_obj = next(
+                (item for item in stored_clients.values() if item["clientId"] == cid),
+                None,
+            )
+            if client_obj is None or client_obj["secret"] != decoded_secret:
+                return httpx2.Response(401, json={"error": "invalid_client_credentials"})
+            form = parse_qs(request.content.decode())
+            requested_scopes = set(form.get("scope", [""])[0].split())
+            allowed_scopes = set(
+                cast_list
+                if isinstance(cast_list := client_obj.get("optionalClientScopes"), list)
+                else []
+            )
+            granted = " ".join(sorted(requested_scopes & allowed_scopes))
+            now = int(time.time())
+            token = jwt.encode(
+                {
+                    "iss": "https://siddu.tailc5da4c.ts.net/realms/stram-staging",
+                    "aud": "https://siddu.tailc5da4c.ts.net/mcp",
+                    "sub": f"service-account-{cid}",
+                    "client_id": cid,
+                    "tenant_id": "local-stram",
+                    "scope": granted,
+                    "iat": now,
+                    "exp": now + 300,
+                },
+                private_key,
+                algorithm="RS256",
+                headers={"kid": "key-1"},
+            )
+            return httpx2.Response(200, json={"access_token": token})
+        return httpx2.Response(404)
+
+    transport = httpx2.MockTransport(handler)
+    with (
+        httpx2.Client(transport=transport) as admin_client,
+        httpx2.Client(transport=transport) as public_client,
+    ):
+        keycloak_negative_tokens._reconcile_seeded_client(
+            admin_client,
+            public_client,
+            "http://127.0.0.1:9080",
+            "https://siddu.tailc5da4c.ts.net",
+            "stram-staging",
+            "stram-quant-smoke",
+            smoke_file,
+            "quant:analytics quant:discover quant:lineage quant:read",
+        )
+        keycloak_negative_tokens._reconcile_seeded_client(
+            admin_client,
+            public_client,
+            "http://127.0.0.1:9080",
+            "https://siddu.tailc5da4c.ts.net",
+            "stram-staging",
+            "stram-quant-discovery-only",
+            disc_file,
+            "quant:discover",
+        )
+        assert put_calls == ["uuid-smoke"]
+        assert stored_clients["uuid-smoke"]["secret"] == smoke_value
+        assert stored_clients["uuid-disc"]["secret"] == disc_value
+        assert stored_clients["uuid-other"]["secret"] == "untouched-secret"  # noqa: S105  # pragma: allowlist secret
+
+        # Second invocation is a no-op (idempotent: zero PUT calls)
+        keycloak_negative_tokens._reconcile_seeded_client(
+            admin_client,
+            public_client,
+            "http://127.0.0.1:9080",
+            "https://siddu.tailc5da4c.ts.net",
+            "stram-staging",
+            "stram-quant-smoke",
+            smoke_file,
+            "quant:analytics quant:discover quant:lineage quant:read",
+        )
+        assert put_calls == ["uuid-smoke"]
