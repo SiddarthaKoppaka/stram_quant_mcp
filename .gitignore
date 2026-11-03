@@ -15,3 +15,4 @@ vendor/
 
 .grimp_cache/
 .import_linter_cache/
+/stram_data/

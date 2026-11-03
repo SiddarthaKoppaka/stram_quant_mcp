@@ -63,6 +63,8 @@ skip_covered = true
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# CI checks the pinned stram_data release out beside the sources; it is not ours to lint or format.
+extend-exclude = ["stram_data", "vendor"]
 
 [tool.ruff.lint]
 # Readability rules are specified in ENGINEERING.md section 3.1 (R1-R16).
