@@ -79,6 +79,10 @@ select = [
   "D",        # R8 docstrings
 ]
 
+[tool.ruff.lint.isort]
+# CI checks stram_data out beside the sources; without this Ruff would treat it as first-party there.
+known-third-party = ["stram_data"]
+
 [tool.ruff.lint.mccabe]
 max-complexity = 10
 
