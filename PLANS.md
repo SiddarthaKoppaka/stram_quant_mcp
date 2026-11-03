@@ -201,8 +201,21 @@ the operator performs that single terminal authentication; the three new service
   with hidden tools; denial throttle; JWKS warm-up before readiness; `Access denied.` with `retryable` metadata;
   request-body cap; FastMCP is the only server; the previous one is on the `archive/sdk-server` branch. The behavior suite, the
   staging acceptance runner over real TLS and an official-client session pass. Details: [implementation plan](docs/superpowers/plans/2026-11-03-fastmcp-migration.md).
-- Not done, needs separate authorization: build and scan the image, approve its digest, run staging acceptance
-  against the real Keycloak and lake, then remove the previous server (see ENGINEERING.md 3.4).
+- Previous server removed (2026-11-03): its last working state is the `archive/sdk-server` branch and the
+  `sdk-server-final` tag. Commit `f01ee99` contains the removal.
+- Staging evidence (2026-11-03, SIDDU, real Keycloak and lake): image built from `f01ee99` with buildx provenance and
+  SBOM, Trivy clean apart from one reviewed exception, imported as
+  `localhost/stram-quant-mcp:m7-fastmcp@sha256:145e1f52...27ddd`. `verify` passes: discovery and JWKS, claims,
+  401/421/403 denials, wrong issuer/audience/tenant/expired, insufficient scope, exactly ten tools, four real-lake
+  calls. `reliability-drill`, `backup-audit` and `verify-backup` pass. The one failed call inside the drill is the
+  deliberate worker pause (`overloaded` after 15 s); the denied `quant_get_aligned_panel` call is the scope probe.
+- Not verified live: the retryable metadata and hidden tools for a narrow-scope caller, and the denial throttle,
+  were covered by automated tests but not exercised with real Keycloak tokens. The rollback drill and
+  `enable-services` remain open.
+- Open risks: the denial throttle also counts unknown-tool names (five within 60 s blocks the caller) and does not
+  cover transport-level 401s; the Host/Origin allowlists set in GitHub were not seen by the author; FastMCP
+  releases often, so any bump needs the full contract and security suites; `operate-the-service.md` still mixes
+  how-to, reference and explanation.
 - Behavior changes to communicate to clients: the denial message is now `Access denied.`; `tools/list` shows only
   callable tools; repeated denials block the caller.
 
