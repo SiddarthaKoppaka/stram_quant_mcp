@@ -1,0 +1,12 @@
+# syntax=docker/dockerfile:1
+# The Quadlet runs PostgreSQL directly as UID/GID 999. The image therefore does
+# not need gosu, which is only used by the upstream entrypoint when it starts as
+# root. Removing it also removes an otherwise unreachable Go runtime attack
+# surface from the staging image.
+ARG POSTGRES_BASE
+FROM ${POSTGRES_BASE}
+ARG POSTGRES_BASE
+USER root
+RUN rm -f /usr/local/bin/gosu && test ! -e /usr/local/bin/gosu
+LABEL org.opencontainers.image.base.name="${POSTGRES_BASE}"
+USER 999:999

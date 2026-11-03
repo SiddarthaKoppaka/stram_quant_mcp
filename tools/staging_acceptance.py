@@ -10,9 +10,11 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
+from urllib.parse import urlsplit
 
 import httpx2
 import jwt
+from jwt.types import Options
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from pydantic import JsonValue
@@ -173,7 +175,7 @@ def _verify_negative_signature(
     signing_key = next((key.key for key in key_set.keys if key.key_id == header["kid"]), None)
     if signing_key is None:
         raise RuntimeError(f"{case} token is not signed by a current Keycloak key")
-    options = {
+    options: Options = {
         "verify_iss": case != "wrong-issuer",
         "verify_aud": case != "wrong-audience",
         "verify_exp": case != "expired",
@@ -218,7 +220,7 @@ def _calls(path: Path) -> list[tuple[str, str, dict[str, JsonValue]]]:
 async def _transport_denials(
     client: httpx2.AsyncClient, config: Configuration, valid_token: str
 ) -> None:
-    cases = (
+    cases: tuple[tuple[str, dict[str, str]], ...] = (
         ("missing token", {}),
         ("bad signature", {"Authorization": "Bearer invalid.invalid.invalid"}),
         (
@@ -280,6 +282,7 @@ async def _insufficient_scope(
     config: Configuration,
     ssl_context: ssl.SSLContext,
     token_endpoint: str,
+    calls: list[tuple[str, str, dict[str, JsonValue]]],
 ) -> None:
     async with httpx2.AsyncClient(timeout=10, verify=ssl_context) as token_client:
         token = await _token(
@@ -303,7 +306,8 @@ async def _insufficient_scope(
         ClientSession(streams[0], streams[1]) as session,
     ):
         await session.initialize()
-        result = await session.call_tool("quant_get_freshness", {})
+        _, tool, arguments = next(call for call in calls if call[0] == "analytics")
+        result = await session.call_tool(tool, arguments)
     if not result.is_error:
         raise RuntimeError("discovery-only token unexpectedly called a read tool")
     _safe_status("insufficient scope", "PASS")
@@ -327,7 +331,14 @@ async def _provided_negative_tokens(
             _safe_status(case, "NOT VERIFIED", "signed token file is absent")
             continue
         token = path.read_text().strip()
-        claims = _verify_negative_signature(config, token, jwks, case)
+        case_jwks = jwks
+        sidecar = config.negative_token_dir / f"{case}.jwks.json"
+        if sidecar.is_file():
+            loaded = json.loads(sidecar.read_text())
+            if not isinstance(loaded, dict) or not isinstance(loaded.get("keys"), list):
+                raise RuntimeError(f"{case} JWKS sidecar is invalid")
+            case_jwks = cast(dict[str, JsonValue], loaded)
+        claims = _verify_negative_signature(config, token, case_jwks, case)
         wrong = {
             "wrong-issuer": claims.get("iss") != config.issuer,
             "wrong-audience": config.resource not in _audiences(claims.get("aud")),
@@ -347,6 +358,33 @@ async def _provided_negative_tokens(
     return complete
 
 
+async def _verify_resource_discovery(client: httpx2.AsyncClient, config: Configuration) -> None:
+    """RFC 9728 / RFC 8414 discovery over the public HTTPS route, starting from the 401."""
+
+    resource = urlsplit(config.resource)
+    origin = f"{resource.scheme}://{resource.netloc}"
+    metadata_url = f"{origin}/.well-known/oauth-protected-resource{resource.path}"
+    challenge = await client.post(config.endpoint, json={})
+    header = challenge.headers.get("www-authenticate", "")
+    if challenge.status_code != 401 or f'resource_metadata="{metadata_url}"' not in header:
+        raise RuntimeError("unauthenticated 401 lacks the exact resource_metadata challenge")
+    metadata = await _json_get(client, metadata_url)
+    if metadata.get("resource") != config.resource:
+        raise RuntimeError("protected-resource metadata resource does not match the audience")
+    if metadata.get("authorization_servers") != [config.issuer]:
+        raise RuntimeError("protected-resource metadata names an unexpected authorization server")
+    if metadata.get("bearer_methods_supported") != ["header"]:
+        raise RuntimeError("protected-resource metadata allows a non-header bearer method")
+    issuer = urlsplit(config.issuer)
+    server_url = (
+        f"{issuer.scheme}://{issuer.netloc}/.well-known/oauth-authorization-server{issuer.path}"
+    )
+    server_metadata = await _json_get(client, server_url)
+    if server_metadata.get("issuer") != config.issuer:
+        raise RuntimeError("authorization-server metadata issuer does not match configuration")
+    _safe_status("RFC 9728 challenge, resource metadata and RFC 8414 server discovery", "PASS")
+
+
 async def _run(config: Configuration) -> int:
     ssl_context = _ssl_context(config.ca_file)
     discovery_url = f"{config.issuer}/.well-known/openid-configuration"
@@ -362,6 +400,7 @@ async def _run(config: Configuration) -> int:
         if not isinstance(jwks.get("keys"), list) or not jwks["keys"]:
             raise RuntimeError("JWKS has no keys")
         _safe_status("trusted HTTPS discovery and non-empty JWKS", "PASS")
+        await _verify_resource_discovery(client, config)
         token = await _token(
             client,
             token_endpoint,
@@ -374,8 +413,8 @@ async def _run(config: Configuration) -> int:
         await _transport_denials(client, config, token)
         negative_complete = await _provided_negative_tokens(config, client, jwks)
 
-    await _insufficient_scope(config, ssl_context, token_endpoint)
     calls = _calls(config.calls_file)
+    await _insufficient_scope(config, ssl_context, token_endpoint, calls)
     async with httpx2.AsyncClient(timeout=30, verify=ssl_context) as mcp_client:
         await _official_client(mcp_client, config.endpoint, token, calls)
     if config.require_complete and not negative_complete:

@@ -20,10 +20,17 @@ APPROVAL=/etc/stram-quant/m6-approval.env
 AUTH_CONFIG=/etc/stram-quant/auth.env
 SECRET_DIR=/etc/stram-quant/secrets
 BACKUP_DIR=/var/lib/stram-quant/audit-backups
+BACKUP_SERVICE=/etc/systemd/system/stram-quant-audit-backup.service
+BACKUP_TIMER=/etc/systemd/system/stram-quant-audit-backup.timer
+EGRESS_RULESET=/etc/stram-quant/stram-quant-egress.nft
+EGRESS_UNIT=/etc/systemd/system/stram-quant-egress.service
+PERSISTENCE_MARKER=/etc/stram-quant/m6-persistence-verified
 QUANT_QUADLET_DIR="$QUANT_HOME/.config/containers/systemd"
 QUANT_QUADLET="$QUANT_QUADLET_DIR/stram-quant-mcp.container"
 AUTH_CONFIG_DIR="$AUTH_HOME/.config/stram-auth"
 AUTH_QUADLET_DIR="$AUTH_HOME/.config/containers/systemd"
+AUTH_SUBID_START=362144
+AUTH_SUBID_COUNT=65536
 EXPECTED_COMMIT=d19133350dfba394dac94f7e5615def4a366a3cc
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -32,8 +39,11 @@ if [ -f "$SCRIPT_DIR/keycloak/stram-staging-realm.json" ]; then
 else
   REPO_ROOT=${STRAM_QUANT_REPO:-/home/siddu/Apps/stram/stram_quant_mcp}
 fi
+IMAGE_ARTIFACT_DIR=${STRAM_IMAGE_ARTIFACT_DIR:-$REPO_ROOT/build/m6}
 REALM_TEMPLATE="$REPO_ROOT/deploy/keycloak/stram-staging-realm.json"
 STAGING_VERIFIER="$REPO_ROOT/tools/staging_acceptance.py"
+STAGING_CALL_GENERATOR="$REPO_ROOT/tools/generate_staging_calls.py"
+NEGATIVE_TOKEN_GENERATOR="$REPO_ROOT/tools/keycloak_negative_tokens.py"
 
 fail() { printf 'BLOCKED: %s\n' "$*" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$*"; }
@@ -104,16 +114,17 @@ for raw in pathlib.Path(sys.argv[1]).read_text().splitlines():
         raise SystemExit("BLOCKED: invalid or repeated auth.env field")
     values[key] = value.strip()
 required = (
-    "KEYCLOAK_BASE_IMAGE_REF", "KEYCLOAK_IMAGE_REF", "POSTGRES_IMAGE_REF",
+    "KEYCLOAK_BASE_IMAGE_REF", "KEYCLOAK_IMAGE_REF", "POSTGRES_BASE_IMAGE_REF",
+    "POSTGRES_IMAGE_REF",
     "KEYCLOAK_PUBLIC_URL", "KEYCLOAK_ADMIN_URL", "KEYCLOAK_REALM",
     "KEYCLOAK_DB_NAME", "KEYCLOAK_DB_USER", "KEYCLOAK_HOST_PORT",
     "KEYCLOAK_MANAGEMENT_PORT", "STRAM_MCP_RESOURCE_URL", "STRAM_MCP_TENANT_ID",
-    "STRAM_MCP_ALLOWED_HOSTS", "STRAM_PRIVATE_CA_FILE",
+    "STRAM_MCP_ALLOWED_HOSTS", "STRAM_PRIVATE_HOST_IPV4", "STRAM_PRIVATE_CA_FILE",
 )
 for key in required:
     if key not in values:
         raise SystemExit("BLOCKED: missing auth.env field " + key)
-for key in ("KEYCLOAK_BASE_IMAGE_REF", "KEYCLOAK_IMAGE_REF", "POSTGRES_IMAGE_REF"):
+for key in ("KEYCLOAK_BASE_IMAGE_REF", "KEYCLOAK_IMAGE_REF", "POSTGRES_BASE_IMAGE_REF", "POSTGRES_IMAGE_REF"):
     if not re.fullmatch(r"[A-Za-z0-9._:/-]+(?::[A-Za-z0-9._-]+)?@sha256:[0-9a-f]{64}", values[key]):
         raise SystemExit("BLOCKED: immutable digest required for " + key)
 for key in ("KEYCLOAK_PUBLIC_URL", "KEYCLOAK_ADMIN_URL", "STRAM_MCP_RESOURCE_URL"):
@@ -129,6 +140,10 @@ if resource.path != "/mcp" or resource.query or resource.fragment:
     raise SystemExit("BLOCKED: STRAM_MCP_RESOURCE_URL must end exactly in /mcp")
 if values["STRAM_MCP_ALLOWED_HOSTS"] != resource.netloc or "*" in values["STRAM_MCP_ALLOWED_HOSTS"]:
     raise SystemExit("BLOCKED: MCP host allowlist must exactly match the resource URL")
+import ipaddress
+private_ip = ipaddress.ip_address(values["STRAM_PRIVATE_HOST_IPV4"])
+if private_ip.version != 4 or private_ip not in ipaddress.ip_network("100.64.0.0/10"):
+    raise SystemExit("BLOCKED: STRAM_PRIVATE_HOST_IPV4 must be a Tailscale IPv4 address")
 if not re.fullmatch(r"[A-Za-z0-9_.:-]{1,100}", values["STRAM_MCP_TENANT_ID"]):
     raise SystemExit("BLOCKED: invalid staging tenant")
 if not re.fullmatch(r"[A-Za-z0-9_.-]{1,63}", values["KEYCLOAK_REALM"]):
@@ -140,21 +155,23 @@ for key in required:
     print(values[key])
 PY
   ) || fail 'Authentication configuration validation failed.'
-  [ "${#AUTH_VALUES[@]}" = 14 ] || fail 'Authentication configuration validation failed.'
+  [ "${#AUTH_VALUES[@]}" = 16 ] || fail 'Authentication configuration validation failed.'
   KEYCLOAK_BASE_IMAGE=${AUTH_VALUES[0]}
   KEYCLOAK_IMAGE=${AUTH_VALUES[1]}
-  POSTGRES_IMAGE=${AUTH_VALUES[2]}
-  KEYCLOAK_PUBLIC_URL=${AUTH_VALUES[3]}
-  KEYCLOAK_ADMIN_URL=${AUTH_VALUES[4]}
-  KEYCLOAK_REALM=${AUTH_VALUES[5]}
-  KEYCLOAK_DB_NAME=${AUTH_VALUES[6]}
-  KEYCLOAK_DB_USER=${AUTH_VALUES[7]}
-  KEYCLOAK_HOST_PORT=${AUTH_VALUES[8]}
-  KEYCLOAK_MANAGEMENT_PORT=${AUTH_VALUES[9]}
-  MCP_RESOURCE_URL=${AUTH_VALUES[10]}
-  MCP_TENANT_ID=${AUTH_VALUES[11]}
-  MCP_ALLOWED_HOSTS=${AUTH_VALUES[12]}
-  PRIVATE_CA_FILE=${AUTH_VALUES[13]}
+  POSTGRES_BASE_IMAGE=${AUTH_VALUES[2]}
+  POSTGRES_IMAGE=${AUTH_VALUES[3]}
+  KEYCLOAK_PUBLIC_URL=${AUTH_VALUES[4]}
+  KEYCLOAK_ADMIN_URL=${AUTH_VALUES[5]}
+  KEYCLOAK_REALM=${AUTH_VALUES[6]}
+  KEYCLOAK_DB_NAME=${AUTH_VALUES[7]}
+  KEYCLOAK_DB_USER=${AUTH_VALUES[8]}
+  KEYCLOAK_HOST_PORT=${AUTH_VALUES[9]}
+  KEYCLOAK_MANAGEMENT_PORT=${AUTH_VALUES[10]}
+  MCP_RESOURCE_URL=${AUTH_VALUES[11]}
+  MCP_TENANT_ID=${AUTH_VALUES[12]}
+  MCP_ALLOWED_HOSTS=${AUTH_VALUES[13]}
+  PRIVATE_HOST_IPV4=${AUTH_VALUES[14]}
+  PRIVATE_CA_FILE=${AUTH_VALUES[15]}
   MCP_ISSUER_URL="$KEYCLOAK_PUBLIC_URL/realms/$KEYCLOAK_REALM"
   MCP_JWKS_URL="$MCP_ISSUER_URL/protocol/openid-connect/certs"
 }
@@ -204,6 +221,8 @@ probe_quant() {
     --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
     --mount "type=bind,src=$LAKE,dst=/lake,ro" "$image" preflight
   as_quant podman run --rm --pull=never --network none \
+    --cpus=2 --ulimit stack=2097152:2097152 \
+    --env MALLOC_ARENA_MAX=2 --env GLIBC_TUNABLES=glibc.malloc.arena_max=2 \
     --userns=keep-id:uid=10001,gid=10001 --user 10001:10001 --read-only \
     --cap-drop=all --security-opt=no-new-privileges \
     --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
@@ -212,7 +231,7 @@ probe_quant() {
 }
 
 write_initial_configs() {
-  install -d -o "$QUANT_USER" -g "$QUANT_USER" -m 0700 "$CONFIG_DIR" "$QUANT_QUADLET_DIR"
+  install -d -o "$QUANT_USER" -g "$QUANT_USER" -m 0700 "$QUANT_HOME/.config" "$CONFIG_DIR" "$QUANT_HOME/.config/containers" "$QUANT_QUADLET_DIR"
   install -d -o root -g root -m 0700 /etc/stram-quant "$SECRET_DIR"
   if [ ! -e "$SERVICE_CONFIG" ]; then
     install -o "$QUANT_USER" -g "$QUANT_USER" -m 0600 /dev/null "$SERVICE_CONFIG"
@@ -229,6 +248,8 @@ STRAM_MCP_ALLOWED_HOSTS=CHANGE_ME.invalid
 STRAM_MCP_ALLOWED_ORIGINS=
 STRAM_MCP_BIND_HOST=0.0.0.0
 STRAM_MCP_BIND_PORT=8000
+STRAM_MCP_WORKER_MAX_RESTARTS=3
+STRAM_MCP_WORKER_RESTART_BACKOFF_SECONDS=0.25
 EOF
     chown "$QUANT_USER:$QUANT_USER" "$SERVICE_CONFIG"
   fi
@@ -265,6 +286,10 @@ updates = dict(zip(
     ("STRAM_MCP_ISSUER_URL", "STRAM_MCP_RESOURCE_URL", "STRAM_MCP_JWKS_URL", "STRAM_MCP_TENANT_ID", "STRAM_MCP_ALLOWED_HOSTS"),
     sys.argv[2:], strict=True,
 ))
+bounded_defaults = {
+    "STRAM_MCP_WORKER_MAX_RESTARTS": "3",
+    "STRAM_MCP_WORKER_RESTART_BACKOFF_SECONDS": "0.25",
+}
 lines = path.read_text().splitlines()
 seen = set()
 result = []
@@ -284,6 +309,12 @@ for line in lines:
         result.append(line)
 if seen != updates.keys():
     raise SystemExit("BLOCKED: service.env is missing required OAuth fields")
+existing = {line.split("=", 1)[0]: line.split("=", 1)[1] for line in result if "=" in line and not line.lstrip().startswith("#")}
+for key, value in bounded_defaults.items():
+    if key in existing and existing[key] != value:
+        raise SystemExit("BLOCKED: existing service.env conflicts with bounded default at " + key)
+    if key not in existing:
+        result.append(key + "=" + value)
 fd, temporary = tempfile.mkstemp(dir=path.parent, prefix="service.env.")
 try:
     with os.fdopen(fd, "w") as handle:
@@ -311,17 +342,32 @@ install_same_or_fail() {
 ensure_secret_file() {
   local path=$1 bytes=$2
   if [ ! -e "$path" ]; then
-    openssl rand -base64 "$bytes" > "$path"
+    openssl rand -base64 "$bytes" | tr '+/' '-_' | tr -d '=\r\n' > "$path"
     chmod 0400 "$path"
     chown root:root "$path"
   fi
   [ "$(stat -c '%U:%a' "$path")" = root:400 ] || fail "Secret file has unsafe ownership or mode: $path"
 }
 
+ensure_urlsafe_secret_file() {
+  local path=$1 bytes=$2
+  ensure_secret_file "$path" "$bytes"
+  if grep -q '[+/=\r\n]' "$path" || [ "$(wc -l < "$path")" -ne 0 ]; then
+    local tmp="${path}.tmp"
+    tr '+/' '-_' < "$path" | tr -d '=\r\n' > "$tmp"
+    chmod 0400 "$tmp"
+    chown root:root "$tmp"
+    mv -f "$tmp" "$path"
+  fi
+  [ "$(stat -c '%U:%a' "$path")" = root:400 ] || fail "Secret file has unsafe ownership or mode: $path"
+}
+
 ensure_auth_podman_secret() {
-  local name=$1 source=$2
+  local name=$1 source=$2 replace=${3:-no}
   if ! as_auth podman secret inspect "$name" >/dev/null 2>&1; then
-    as_auth podman secret create "$name" - < "$source" >/dev/null
+    tr -d '\r\n' < "$source" | as_auth podman secret create "$name" - >/dev/null
+  elif [ "$replace" = yes ]; then
+    tr -d '\r\n' < "$source" | as_auth podman secret create --replace "$name" - >/dev/null 2>&1 || true
   fi
 }
 
@@ -329,6 +375,8 @@ render_auth_quadlets() {
   cat > "$AUTH_QUADLET_DIR/stram-keycloak-db.container" <<EOF
 [Unit]
 Description=Stram private Keycloak PostgreSQL
+StartLimitIntervalSec=300
+StartLimitBurst=3
 
 [Container]
 Image=$POSTGRES_IMAGE
@@ -352,7 +400,7 @@ Environment=POSTGRES_DB=$KEYCLOAK_DB_NAME
 Environment=POSTGRES_USER=$KEYCLOAK_DB_USER
 Environment=POSTGRES_PASSWORD_FILE=/run/secrets/db-password
 Environment="POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 --auth-local=scram-sha-256 --data-checksums"
-HealthCmd=/usr/local/bin/pg_isready -U $KEYCLOAK_DB_USER -d $KEYCLOAK_DB_NAME
+HealthCmd=/usr/bin/pg_isready -U $KEYCLOAK_DB_USER -d $KEYCLOAK_DB_NAME
 HealthInterval=10s
 HealthTimeout=5s
 HealthRetries=12
@@ -362,8 +410,6 @@ StopTimeout=30
 [Service]
 Restart=on-failure
 RestartSec=10s
-StartLimitIntervalSec=300
-StartLimitBurst=3
 CPUQuota=100%
 TimeoutStartSec=180
 TimeoutStopSec=45
@@ -373,6 +419,8 @@ EOF
 Description=Stram private staging Keycloak
 Requires=stram-keycloak-db.service
 After=stram-keycloak-db.service
+StartLimitIntervalSec=300
+StartLimitBurst=3
 
 [Container]
 Image=$KEYCLOAK_IMAGE
@@ -419,12 +467,19 @@ Exec=start --optimized --import-realm
 [Service]
 Restart=on-failure
 RestartSec=10s
-StartLimitIntervalSec=300
-StartLimitBurst=3
 CPUQuota=200%
 TimeoutStartSec=180
 TimeoutStopSec=45
 EOF
+  if [ -e "$PERSISTENCE_MARKER" ]; then
+    for quadlet in "$AUTH_QUADLET_DIR/stram-keycloak-db.container" "$AUTH_QUADLET_DIR/stram-keycloak.container"; do
+      cat >> "$quadlet" <<'EOF'
+
+[Install]
+WantedBy=default.target
+EOF
+    done
+  fi
   chown "$AUTH_USER:$AUTH_USER" "$AUTH_QUADLET_DIR"/*.container
   chmod 0600 "$AUTH_QUADLET_DIR"/*.container
 }
@@ -443,6 +498,7 @@ doctor() {
   fi
   if tailscale status --json >/dev/null 2>&1; then pass 'Tailscale state is readable'; else not_verified 'Tailscale state is unavailable'; fi
   if tailscale serve status 2>/dev/null | grep -q .; then pass 'a Tailscale Serve route exists and still requires topology review'; else not_verified 'no readable Tailscale Serve route'; fi
+  if [ -f "$AUTH_CONFIG" ]; then discovery_routes discovery-routes status; fi
   if command -v caddy >/dev/null || command -v nginx >/dev/null || command -v traefik >/dev/null; then
     pass 'a reverse-proxy binary is installed; configuration still requires review'
   else
@@ -466,6 +522,76 @@ prepare() {
   printf 'Review and edit: %s, %s, %s\n' "$AUTH_CONFIG" "$SERVICE_CONFIG" "$APPROVAL"
 }
 
+provision_auth() {
+  require_root
+  if ! id "$AUTH_USER" >/dev/null 2>&1; then
+    useradd --create-home --home-dir "$AUTH_HOME" --shell /usr/bin/nologin "$AUTH_USER"
+  fi
+  [ "$(getent passwd "$AUTH_USER" | cut -d: -f6)" = "$AUTH_HOME" ] || fail 'stram-auth has an unexpected home directory.'
+  [ "$(getent passwd "$AUTH_USER" | cut -d: -f7)" = /usr/bin/nologin ] || fail 'stram-auth must use /usr/bin/nologin.'
+  python3 - /etc/subuid /etc/subgid "$AUTH_USER" "$AUTH_SUBID_START" "$AUTH_SUBID_COUNT" <<'PY'
+import pathlib, sys
+user = sys.argv[3]
+start, count = map(int, sys.argv[4:])
+end = start + count
+for name in sys.argv[1:3]:
+    for raw in pathlib.Path(name).read_text().splitlines():
+        parts = raw.split(":")
+        if len(parts) != 3 or not parts[1].isdigit() or not parts[2].isdigit():
+            continue
+        if parts[0] == user:
+            continue
+        other_start, other_count = map(int, parts[1:])
+        if max(start, other_start) < min(end, other_start + other_count):
+            raise SystemExit(f"BLOCKED: requested subordinate ID range overlaps {name}: {raw}")
+PY
+  if ! grep -qx "$AUTH_USER:$AUTH_SUBID_START:$AUTH_SUBID_COUNT" /etc/subuid || ! grep -qx "$AUTH_USER:$AUTH_SUBID_START:$AUTH_SUBID_COUNT" /etc/subgid; then
+    grep -q "^$AUTH_USER:" /etc/subuid || usermod --add-subuids "$AUTH_SUBID_START-$((AUTH_SUBID_START + AUTH_SUBID_COUNT - 1))" "$AUTH_USER"
+    grep -q "^$AUTH_USER:" /etc/subgid || usermod --add-subgids "$AUTH_SUBID_START-$((AUTH_SUBID_START + AUTH_SUBID_COUNT - 1))" "$AUTH_USER"
+  fi
+  grep -qx "$AUTH_USER:$AUTH_SUBID_START:$AUTH_SUBID_COUNT" /etc/subuid || fail 'Unexpected stram-auth subordinate UID allocation.'
+  grep -qx "$AUTH_USER:$AUTH_SUBID_START:$AUTH_SUBID_COUNT" /etc/subgid || fail 'Unexpected stram-auth subordinate GID allocation.'
+  loginctl enable-linger "$AUTH_USER"
+  systemctl start "user@$(id -u "$AUTH_USER").service"
+  install -d -o "$AUTH_USER" -g "$AUTH_USER" -m 0700 "$AUTH_HOME/.config" "$AUTH_HOME/.config/containers" "$AUTH_QUADLET_DIR"
+  chown root:"$QUANT_USER" /srv/stram-quant
+  chmod 0750 /srv/stram-quant
+  as_auth test ! -r "$LAKE/_manifests/economic_observation/_active.json" || fail 'stram-auth can read the Stock lake.'
+  if ! as_quant podman network exists "$QUANT_NETWORK"; then
+    as_quant podman network create "$QUANT_NETWORK" >/dev/null
+  fi
+  [ "$(as_auth podman info --format '{{.Host.Security.Rootless}}')" = true ] || fail 'Auth Podman must be rootless.'
+  pass 'dedicated stram-auth rootless identity, subordinate IDs, linger and lake isolation are provisioned'
+}
+
+import_images() {
+  require_root
+  auth_values
+  local approved_image rollback_image
+  approved_image=$(env_value "$APPROVAL" APPROVED_IMAGE_REF)
+  rollback_image=$(env_value "$APPROVAL" ROLLBACK_IMAGE_REF)
+  digest_ref "$approved_image" || fail 'APPROVED_IMAGE_REF is not an immutable digest reference.'
+  digest_ref "$rollback_image" || fail 'ROLLBACK_IMAGE_REF is not an immutable digest reference.'
+  local keycloak_archive="$IMAGE_ARTIFACT_DIR/keycloak-26.8.1.tar"
+  local postgres_archive="$IMAGE_ARTIFACT_DIR/postgres-17.11-stram1.tar"
+  local quant_archive="$IMAGE_ARTIFACT_DIR/quant-candidate.tar"
+  local rollback_archive="$IMAGE_ARTIFACT_DIR/quant-review.tar"
+  for archive in "$keycloak_archive" "$postgres_archive" "$quant_archive" "$rollback_archive"; do
+    [ -s "$archive" ] || fail "Missing image archive: $archive"
+  done
+  as_auth podman image exists "$KEYCLOAK_IMAGE" || as_auth podman load < "$keycloak_archive" >/dev/null
+  as_auth podman image exists "$POSTGRES_IMAGE" || as_auth podman load < "$postgres_archive" >/dev/null
+  as_quant podman image exists "$approved_image" || as_quant podman load < "$quant_archive" >/dev/null
+  if ! as_quant podman image exists "$rollback_image" || ! as_quant podman image exists "$REVIEW_IMAGE"; then
+    as_quant podman load < "$rollback_archive" >/dev/null
+  fi
+  as_auth podman image exists "$KEYCLOAK_IMAGE" || fail 'Imported Keycloak digest does not match auth.env.'
+  as_auth podman image exists "$POSTGRES_IMAGE" || fail 'Imported PostgreSQL digest does not match auth.env.'
+  as_quant podman image exists "$approved_image" || fail 'Imported Quant digest does not match m6-approval.env.'
+  as_quant podman image exists "$rollback_image" || fail 'Imported rollback digest does not match m6-approval.env.'
+  pass 'reviewed immutable images are imported into the separate rootless service stores'
+}
+
 auth_prepare() {
   require_root
   require_command openssl
@@ -476,16 +602,17 @@ auth_prepare() {
   as_auth podman image exists "$KEYCLOAK_IMAGE" || fail 'Approved optimized Keycloak digest is not in stram-auth Podman storage.'
   as_auth podman image exists "$POSTGRES_IMAGE" || fail 'Approved PostgreSQL digest is not in stram-auth Podman storage.'
   [ "$(as_auth podman image inspect "$KEYCLOAK_IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.base.name"}}')" = "$KEYCLOAK_BASE_IMAGE" ] || fail 'Optimized Keycloak image base digest label does not match auth.env.'
-  install -d -o "$AUTH_USER" -g "$AUTH_USER" -m 0700 "$AUTH_CONFIG_DIR" "$AUTH_CONFIG_DIR/import" "$AUTH_QUADLET_DIR"
+  [ "$(as_auth podman image inspect "$POSTGRES_IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.base.name"}}')" = "$POSTGRES_BASE_IMAGE" ] || fail 'Hardened PostgreSQL image base digest label does not match auth.env.'
+  install -d -o "$AUTH_USER" -g "$AUTH_USER" -m 0700 "$AUTH_HOME/.config" "$AUTH_CONFIG_DIR" "$AUTH_CONFIG_DIR/import" "$AUTH_HOME/.config/containers" "$AUTH_QUADLET_DIR"
   install_same_or_fail "$REALM_TEMPLATE" "$AUTH_CONFIG_DIR/import/$KEYCLOAK_REALM-realm.json" "$AUTH_USER"
   ensure_secret_file "$SECRET_DIR/keycloak-db-password" 48
   ensure_secret_file "$SECRET_DIR/keycloak-bootstrap-password" 48
-  ensure_secret_file "$SECRET_DIR/keycloak-smoke-client-secret" 48
-  ensure_secret_file "$SECRET_DIR/keycloak-discovery-client-secret" 48
+  ensure_urlsafe_secret_file "$SECRET_DIR/keycloak-smoke-client-secret" 48
+  ensure_urlsafe_secret_file "$SECRET_DIR/keycloak-discovery-client-secret" 48
   ensure_auth_podman_secret stram-keycloak-db-password "$SECRET_DIR/keycloak-db-password"
   ensure_auth_podman_secret stram-keycloak-bootstrap-password "$SECRET_DIR/keycloak-bootstrap-password"
-  ensure_auth_podman_secret stram-keycloak-smoke-secret "$SECRET_DIR/keycloak-smoke-client-secret"
-  ensure_auth_podman_secret stram-keycloak-discovery-secret "$SECRET_DIR/keycloak-discovery-client-secret"
+  ensure_auth_podman_secret stram-keycloak-smoke-secret "$SECRET_DIR/keycloak-smoke-client-secret" yes
+  ensure_auth_podman_secret stram-keycloak-discovery-secret "$SECRET_DIR/keycloak-discovery-client-secret" yes
   as_auth podman network exists "$AUTH_NETWORK" || as_auth podman network create --internal "$AUTH_NETWORK" >/dev/null
   as_auth podman volume exists stram-keycloak-db || as_auth podman volume create stram-keycloak-db >/dev/null
   render_auth_quadlets
@@ -496,6 +623,71 @@ auth_prepare() {
   not_verified 'units remain stopped and disabled until explicit operator authorization'
 }
 
+install_egress() {
+  require_root
+  require_command nft
+  require_command tailscale
+  auth_values
+  local current_ip quant_uid
+  current_ip=$(tailscale ip -4) || fail 'Unable to read the current Tailscale IPv4 address.'
+  [ "$current_ip" = "$PRIVATE_HOST_IPV4" ] || fail 'auth.env Tailscale IPv4 does not match this node.'
+  quant_uid=$(id -u "$QUANT_USER") || fail 'Missing stram-quant identity.'
+  local quant_was_active=no
+  if as_quant systemctl --user is-active --quiet stram-quant-mcp.service; then
+    quant_was_active=yes
+    as_quant systemctl --user stop stram-quant-mcp.service
+  fi
+  cat > "$EGRESS_RULESET" <<EOF
+table inet stram_quant {
+  chain output {
+    type filter hook output priority filter; policy accept;
+    meta skuid $quant_uid oifname "lo" ip saddr 127.0.0.1 ip daddr 127.0.0.1 tcp sport 8800 tcp flags != syn / syn,ack counter accept
+    meta skuid $quant_uid ip daddr $PRIVATE_HOST_IPV4 tcp dport 443 counter accept
+    meta skuid $quant_uid counter reject with icmpx type admin-prohibited
+  }
+}
+EOF
+  chmod 0600 "$EGRESS_RULESET"
+  chown root:root "$EGRESS_RULESET"
+  cat > "$EGRESS_UNIT" <<EOF
+[Unit]
+Description=Stram Quant MCP UID-scoped OIDC-only egress policy
+After=firewalld.service tailscaled.service
+Wants=tailscaled.service
+Before=user@$quant_uid.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/nft -f $EGRESS_RULESET
+ExecStop=/usr/bin/nft delete table inet stram_quant
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  chmod 0644 "$EGRESS_UNIT"
+  chown root:root "$EGRESS_UNIT"
+  local user_dropin_dir="/etc/systemd/system/user@$quant_uid.service.d"
+  install -d -o root -g root -m 0755 "$user_dropin_dir"
+  cat > "$user_dropin_dir/stram-quant-egress.conf" <<EOF
+[Unit]
+Requires=stram-quant-egress.service
+After=stram-quant-egress.service
+EOF
+  chmod 0644 "$user_dropin_dir/stram-quant-egress.conf"
+  chown root:root "$user_dropin_dir/stram-quant-egress.conf"
+  systemctl daemon-reload
+  if systemctl is-active --quiet stram-quant-egress.service; then
+    systemctl stop stram-quant-egress.service
+  fi
+  nft list table inet stram_quant >/dev/null 2>&1 && nft delete table inet stram_quant
+  systemctl enable --now stram-quant-egress.service
+  nft list chain inet stram_quant output | grep -F "meta skuid $quant_uid ip daddr $PRIVATE_HOST_IPV4 tcp dport 443" >/dev/null || fail 'Quant allowlist rule is missing.'
+  nft list chain inet stram_quant output | grep -F "meta skuid $quant_uid counter" >/dev/null || fail 'Quant default egress rejection rule is missing.'
+  if [ "$quant_was_active" = yes ]; then as_quant systemctl --user start stram-quant-mcp.service; fi
+  pass 'persistent UID-scoped egress permits only SIDDU Tailscale HTTPS and rejects DNS/IPv4/IPv6 alternatives'
+}
+
 auth_start() {
   require_root
   auth_values
@@ -503,7 +695,7 @@ auth_start() {
   [ "$(env_value "$APPROVAL" PRIVATE_TLS_AND_HOST_POLICY_VERIFIED)" = yes ] || fail 'Private TLS/Host policy evidence is not approved.'
   as_auth systemctl --user start stram-keycloak-db.service
   as_auth systemctl --user start stram-keycloak.service
-  for _ in $(seq 1 60); do
+  for _ in $(seq 1 120); do
     if curl --fail --silent --max-time 2 "http://127.0.0.1:$KEYCLOAK_MANAGEMENT_PORT/health/ready" >/dev/null; then
       pass 'Keycloak local management readiness passed'
       return
@@ -532,6 +724,7 @@ PY
   image=$(env_value "$APPROVAL" APPROVED_IMAGE_REF)
   digest_ref "$image" || image=$REVIEW_IMAGE
   as_quant podman run --rm --pull=never --network "$QUANT_NETWORK" \
+    --add-host "$MCP_ALLOWED_HOSTS:$PRIVATE_HOST_IPV4" \
     --userns=keep-id:uid=10001,gid=10001 --user 10001:10001 --read-only \
     --cap-drop=all --security-opt=no-new-privileges \
     --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
@@ -544,6 +737,31 @@ if value.get("issuer") != sys.argv[2] or value.get("jwks_uri") != sys.argv[3]:
     raise SystemExit("container discovery drift")
 print("PASS: MCP container validates the issuer certificate and exact discovery metadata")
 PY
+}
+
+prepare_acceptance() {
+  require_root
+  auth_values
+  [ -x "$REPO_ROOT/.venv/bin/python" ] || fail 'Frozen repository environment is missing.'
+  auth_verify
+  "$REPO_ROOT/.venv/bin/python" "$STAGING_CALL_GENERATOR" \
+    --parquet-root "$LAKE" --output /etc/stram-quant/staging-calls.json
+  local negative_args=(
+    --admin-loopback "http://127.0.0.1:$KEYCLOAK_HOST_PORT" \
+    --public-url "$KEYCLOAK_PUBLIC_URL" \
+    --realm "$KEYCLOAK_REALM" \
+    --resource "$MCP_RESOURCE_URL" \
+    --tenant "$MCP_TENANT_ID" \
+    --bootstrap-password-file "$SECRET_DIR/keycloak-bootstrap-password" \
+    --smoke-secret-file "$SECRET_DIR/keycloak-smoke-client-secret" \
+    --discovery-secret-file "$SECRET_DIR/keycloak-discovery-client-secret" \
+    --output-dir /etc/stram-quant/negative-tokens
+  )
+  if [ -n "$PRIVATE_CA_FILE" ]; then negative_args+=(--ca-file "$PRIVATE_CA_FILE"); fi
+  "$REPO_ROOT/.venv/bin/python" "$NEGATIVE_TOKEN_GENERATOR" "${negative_args[@]}"
+  chown -R root:root /etc/stram-quant/negative-tokens
+  chmod 0700 /etc/stram-quant/negative-tokens
+  pass 'real-lake calls and genuine Keycloak-signed negative JWT evidence are prepared'
 }
 
 validate_approval() {
@@ -563,7 +781,7 @@ def parse(path):
 try:
     service, approval = parse(sys.argv[1]), parse(sys.argv[2])
     exact = {"STRAM_MCP_ISSUER_URL": sys.argv[3], "STRAM_MCP_RESOURCE_URL": sys.argv[4], "STRAM_MCP_JWKS_URL": sys.argv[5]}
-    exact.update({"STRAM_MCP_PARQUET_ROOT": "/lake", "STRAM_MCP_AUDIT_DB": "/audit/audit.sqlite3", "STRAM_MCP_AUDIT_KEY_FILE": "/run/secrets/audit-key", "STRAM_MCP_BIND_HOST": "0.0.0.0", "STRAM_MCP_BIND_PORT": "8000", "STRAM_MCP_ALLOWED_ORIGINS": ""})
+    exact.update({"STRAM_MCP_PARQUET_ROOT": "/lake", "STRAM_MCP_AUDIT_DB": "/audit/audit.sqlite3", "STRAM_MCP_AUDIT_KEY_FILE": "/run/secrets/audit-key", "STRAM_MCP_BIND_HOST": "0.0.0.0", "STRAM_MCP_BIND_PORT": "8000", "STRAM_MCP_ALLOWED_ORIGINS": "", "STRAM_MCP_WORKER_MAX_RESTARTS": "3", "STRAM_MCP_WORKER_RESTART_BACKOFF_SECONDS": "0.25"})
     for key, value in exact.items():
         if service.get(key) != value: raise ValueError("incorrect " + key)
     if any("SECRET" in key or "TOKEN" in key or "PASSWORD" in key or key in {"STRAM_MCP_ALLOW_INSECURE_HTTP", "STRAM_MCP_AUDIT_KEY"} for key in service):
@@ -571,7 +789,10 @@ try:
     image = approval.get("APPROVED_IMAGE_REF", "")
     if not re.fullmatch(r"[A-Za-z0-9._:/-]+(?::[A-Za-z0-9._-]+)?@sha256:[0-9a-f]{64}", image):
         raise ValueError("approved registry digest is missing")
-    gates = ("M6_STAGING_AUTHORIZED", "SBOM_PROVENANCE_VULNERABILITY_APPROVED", "PRIVATE_TLS_AND_HOST_POLICY_VERIFIED", "FIREWALL_EGRESS_IPV4_IPV6_VERIFIED", "NONPROD_OIDC_AND_JWKS_VERIFIED", "AUDIT_BACKUP_CHECKPOINT_RETENTION_VERIFIED", "ROLLBACK_IMAGE_AND_DRILL_VERIFIED")
+    # Backup and rollback evidence is necessarily produced after first activation.
+    # Those post-activation controls remain explicit gates in m6-approval.env and
+    # are checked by the operational handoff, not forged to break this dependency.
+    gates = ("M6_STAGING_AUTHORIZED", "SBOM_PROVENANCE_VULNERABILITY_APPROVED", "PRIVATE_TLS_AND_HOST_POLICY_VERIFIED", "FIREWALL_EGRESS_IPV4_IPV6_VERIFIED", "NONPROD_OIDC_AND_JWKS_VERIFIED")
     for gate in gates:
         if approval.get(gate) != "yes": raise ValueError("staging not approved: " + gate)
     print(image)
@@ -589,6 +810,8 @@ render_quant_quadlet() {
 [Unit]
 Description=Stram Quant MCP isolated M6 staging
 After=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=3
 
 [Container]
 Image=$image
@@ -602,26 +825,52 @@ NoNewPrivileges=true
 DropCapability=all
 PidsLimit=128
 Memory=1536m
+Ulimit=stack=2097152:2097152
+PodmanArgs=--cpus=2
 Tmpfs=/tmp:rw,noexec,nosuid,nodev,size=64m
 Volume=$LAKE:/lake:ro,nosuid,nodev,noexec
 Volume=$AUDIT_VOLUME:/audit:rw,nosuid,nodev,noexec,nocopy
 Secret=$AUDIT_SECRET,type=mount,target=audit-key,uid=10001,gid=10001,mode=0400
 EnvironmentFile=$SERVICE_CONFIG
 Environment=STRAM_MCP_IMAGE_DIGEST=${image##*@}
+Environment=MALLOC_ARENA_MAX=2
+Environment=GLIBC_TUNABLES=glibc.malloc.arena_max=2
 Network=$QUANT_NETWORK
+AddHost=$MCP_ALLOWED_HOSTS:$PRIVATE_HOST_IPV4
 PublishPort=127.0.0.1:8800:8000
 StopTimeout=15
 
 [Service]
 Restart=on-failure
 RestartSec=5s
-StartLimitIntervalSec=120
-StartLimitBurst=3
 CPUQuota=200%
 TimeoutStartSec=90
 TimeoutStopSec=25
 ExecStartPre=/usr/bin/test -r $LAKE/_manifests/economic_observation/_active.json
 EOF
+  if [ -e "$PERSISTENCE_MARKER" ]; then
+    cat >> "$output" <<'EOF'
+
+[Install]
+WantedBy=default.target
+EOF
+  fi
+}
+
+wait_for_mcp_readiness() {
+  local timeout=${1:-30} elapsed=0 response code err
+  while [ "$elapsed" -lt "$timeout" ]; do
+    response=$(curl --write-out '\n%{http_code}' --silent --show-error --max-time 2 http://127.0.0.1:8800/health/ready 2>&1) && err=0 || err=$?
+    code=$(tail -n 1 <<<"$response")
+    if [ "$err" -eq 0 ] && [ "$code" = "200" ]; then
+      return 0
+    fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+  printf 'FAIL: MCP readiness check timed out after %ds (last exit: %d, HTTP: %s, output: %s)\n' \
+    "$timeout" "$err" "$code" "$(head -n -1 <<<"$response" | tr '\n' ' ')" >&2
+  return 1
 }
 
 activate() {
@@ -630,6 +879,9 @@ activate() {
   validate_approval
   as_quant podman image exists "$APPROVED_IMAGE" || fail 'Approved digest is not in stram-quant Podman storage.'
   as_quant podman network exists "$QUANT_NETWORK" || fail 'Private Quant network is not configured.'
+  if as_quant systemctl --user is-active --quiet stram-quant-mcp.service; then
+    as_quant systemctl --user stop stram-quant-mcp.service
+  fi
   ss -H -lnt '( sport = :8800 )' | grep -q . && fail 'Port 8800 is already in use.'
   probe_quant "$APPROVED_IMAGE"
   local temporary
@@ -641,14 +893,8 @@ activate() {
   as_quant systemctl --user daemon-reload
   as_quant systemctl --user cat stram-quant-mcp.service >/dev/null || fail 'Quant Quadlet generation failed.'
   as_quant systemctl --user start stram-quant-mcp.service
-  for _ in $(seq 1 30); do
-    if curl --fail --silent --max-time 2 http://127.0.0.1:8800/health/ready >/dev/null; then
-      pass 'staging MCP readiness passed; unit remains boot-disabled'
-      return
-    fi
-    sleep 1
-  done
-  fail 'MCP readiness failed; preserve the journal and inspect the user journal.'
+  wait_for_mcp_readiness 30 || fail 'MCP readiness failed; preserve the journal and inspect the user journal.'
+  pass 'staging MCP readiness passed; unit remains boot-disabled'
 }
 
 verify_seccomp() {
@@ -656,10 +902,11 @@ verify_seccomp() {
     main=$(awk "/^Seccomp_filters:/ {print \$2}" /proc/1/status)
     max=$main
     for status in /proc/[0-9]*/status; do
+      [ -r "$status" ] || continue
       mode=$(awk "/^Seccomp:/ {print \$2}" "$status")
       filters=$(awk "/^Seccomp_filters:/ {print \$2}" "$status")
       [ "$mode" = 2 ] || continue
-      [ "$filters" -gt "$max" ] && max=$filters
+      if [ "${filters:-0}" -gt "$max" ]; then max=$filters; fi
     done
     [ "$max" -gt "$main" ]
     printf "PASS: worker process has an additional seccomp filter (main=%s worker=%s)\n" "$main" "$max"'
@@ -680,14 +927,7 @@ for host, port, label in targets:
 PY
 }
 
-verify() {
-  require_root
-  auth_values
-  auth_verify
-  curl --fail --silent --max-time 3 http://127.0.0.1:8800/health/ready >/dev/null || fail 'MCP is not ready.'
-  verify_seccomp
-  verify_egress_denials
-  [ -x "$REPO_ROOT/.venv/bin/python" ] || fail 'Frozen repository environment is missing.'
+run_acceptance() {
   local acceptance_args=(
     --endpoint "$MCP_RESOURCE_URL" --issuer "$MCP_ISSUER_URL" --resource "$MCP_RESOURCE_URL"
     --tenant "$MCP_TENANT_ID"
@@ -701,15 +941,69 @@ verify() {
   "$REPO_ROOT/.venv/bin/python" "$STAGING_VERIFIER" "${acceptance_args[@]}"
 }
 
+verify() {
+  require_root
+  auth_values
+  auth_verify
+  curl --fail --silent --max-time 3 http://127.0.0.1:8800/health/ready >/dev/null || fail 'MCP is not ready.'
+  verify_seccomp
+  verify_egress_denials
+  [ -x "$REPO_ROOT/.venv/bin/python" ] || fail 'Frozen repository environment is missing.'
+  run_acceptance
+}
+
+reliability_drill() {
+  require_root
+  auth_values
+  [ -x "$REPO_ROOT/.venv/bin/python" ] || fail 'Frozen repository environment is missing.'
+  local worker_pid
+  worker_pid=$(as_quant podman exec stram-quant-mcp /bin/sh -eu -c '
+    main=$(awk "/^Seccomp_filters:/ {print \$2}" /proc/1/status)
+    for status in /proc/[0-9]*/status; do
+      [ -r "$status" ] || continue
+      pid=$(awk "/^Pid:/ {print \$2}" "$status")
+      parent=$(awk "/^PPid:/ {print \$2}" "$status")
+      filters=$(awk "/^Seccomp_filters:/ {print \$2}" "$status")
+      if [ "$pid" != 1 ] && [ "$parent" = 1 ] && [ "${filters:-0}" -gt "$main" ]; then
+        printf "%s\n" "$pid"
+        exit 0
+      fi
+    done
+    exit 1') || fail 'Unable to identify the production query worker.'
+  # The slim runtime image has no kill(1) binary; use the POSIX shell builtin.
+  as_quant podman exec stram-quant-mcp /bin/sh -eu -c 'kill -STOP "$1"' sh "$worker_pid"
+  if run_acceptance; then
+    fail 'Paused production worker did not trigger a bounded tool timeout.'
+  fi
+  curl --retry 10 --retry-delay 1 --fail --silent --max-time 3 http://127.0.0.1:8800/health/ready >/dev/null || fail 'Worker did not recover after its hard timeout.'
+  run_acceptance
+  as_quant systemctl --user restart stram-quant-mcp.service
+  wait_for_mcp_readiness 30 || fail 'Service did not recover from a controlled restart.'
+  run_acceptance
+  local restart_policy
+  restart_policy=$(as_quant systemctl --user show stram-quant-mcp.service \
+    --property=Restart --property=StartLimitBurst --property=StartLimitIntervalUSec)
+  grep -q '^Restart=on-failure$' <<<"$restart_policy" || fail 'Service restart policy is not on-failure.'
+  grep -q '^StartLimitBurst=3$' <<<"$restart_policy" || fail 'Service restart burst is not bounded to three.'
+  grep -Eq '^StartLimitIntervalUSec=(2min|120s)$' <<<"$restart_policy" || fail 'Service restart interval is not bounded to 120 seconds.'
+  pass 'live worker timeout/failure/recovery and controlled service restart passed'
+}
+
 backup_audit() {
   require_root
   APPROVED_IMAGE=$(env_value "$APPROVAL" APPROVED_IMAGE_REF)
   digest_ref "$APPROVED_IMAGE" || fail 'Approved audit-backup image is not an immutable digest reference.'
   as_quant podman image exists "$APPROVED_IMAGE" || fail 'Approved audit-backup image is not retained locally.'
+  # The parent must be traversable by the rootless service user despite umask 077.
+  install -d -o root -g root -m 0755 "$(dirname "$BACKUP_DIR")"
   install -d -o "$QUANT_USER" -g "$QUANT_USER" -m 0700 "$BACKUP_DIR"
   ensure_secret_file "$SECRET_DIR/checkpoint-signing-key" 32
   local stamp image backup checkpoint verification
   stamp=$(date -u +%Y%m%dT%H%M%SZ)
+  if [ -e "$BACKUP_DIR/audit-$stamp.sqlite3" ]; then
+    sleep 1
+    stamp=$(date -u +%Y%m%dT%H%M%SZ)
+  fi
   image=$APPROVED_IMAGE
   backup="$BACKUP_DIR/audit-$stamp.sqlite3"
   checkpoint="$BACKUP_DIR/audit-$stamp.checkpoint.json"
@@ -742,7 +1036,88 @@ os.chmod(checkpoint, 0o400)
 os.chmod(backup, 0o400)
 PY
   chown root:root "$backup" "$checkpoint"
+  find "$BACKUP_DIR" -maxdepth 1 -type f \
+    \( -name 'audit-*.sqlite3' -o -name 'audit-*.checkpoint.json' \) \
+    -mtime +30 -delete
+  verify_backup "$backup" "$checkpoint"
   pass 'WAL-consistent audit backup independently verified and externally checkpointed'
+}
+
+verify_backup() {
+  require_root
+  local backup=${1:-} checkpoint=${2:-}
+  if [ -z "$checkpoint" ]; then
+    local checkpoints=("$BACKUP_DIR"/audit-*.checkpoint.json)
+    [ -e "${checkpoints[0]}" ] || fail 'No audit checkpoint is available.'
+    checkpoint=${checkpoints[${#checkpoints[@]}-1]}
+    backup=${checkpoint%.checkpoint.json}.sqlite3
+  fi
+  [ -f "$backup" ] && [ -f "$checkpoint" ] || fail 'Audit backup/checkpoint pair is incomplete.'
+  python3 - "$backup" "$checkpoint" "$SECRET_DIR/checkpoint-signing-key" <<'PY'
+import hashlib, hmac, json, pathlib, sys
+backup, checkpoint, key_path = map(pathlib.Path, sys.argv[1:])
+value = json.loads(checkpoint.read_text())
+payload, signature = value.get("payload"), value.get("signature")
+if not isinstance(payload, dict) or not isinstance(signature, str):
+    raise SystemExit("BLOCKED: invalid checkpoint structure")
+encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+expected = hmac.new(key_path.read_bytes().strip(), encoded, hashlib.sha256).hexdigest()
+if not hmac.compare_digest(signature, expected):
+    raise SystemExit("BLOCKED: checkpoint signature is invalid")
+if payload.get("backup_sha256") != hashlib.sha256(backup.read_bytes()).hexdigest():
+    raise SystemExit("BLOCKED: backup digest does not match checkpoint")
+PY
+  local image temporary_dir status=0
+  image=$(env_value "$APPROVAL" APPROVED_IMAGE_REF)
+  as_quant podman image exists "$image" || fail 'Audit verification image is not retained locally.'
+  temporary_dir=$(mktemp -d)
+  chown "$QUANT_USER:$QUANT_USER" "$temporary_dir"
+  chmod 0700 "$temporary_dir"
+  # Verify a disposable copy: SQLite WAL readers need a writable directory for -shm/-wal and
+  # the journal opener normalizes file mode. The checkpointed original is never mounted.
+  install -o "$QUANT_USER" -g "$QUANT_USER" -m 0600 "$backup" "$temporary_dir/audit.sqlite3"
+  as_quant podman run --rm --pull=never --network none \
+    --userns=keep-id:uid=10001,gid=10001 --user 10001:10001 --read-only \
+    --cap-drop=all --security-opt=no-new-privileges \
+    --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
+    --mount "type=bind,src=$temporary_dir,dst=/verify,rw" \
+    --secret "$AUDIT_SECRET,type=mount,target=audit-key,uid=10001,gid=10001,mode=0400" \
+    --entrypoint /opt/venv/bin/python "$image" -m stram_quant_mcp.audit verify \
+    --db /verify/audit.sqlite3 --key-file /run/secrets/audit-key >/dev/null || status=$?
+  rm -rf "$temporary_dir"
+  [ "$status" = 0 ] || fail 'Independent audit HMAC chain verification failed.'
+  pass 'independent checkpoint signature, backup digest and audit HMAC chain verification passed'
+}
+
+install_backup_timer() {
+  require_root
+  cat > "$BACKUP_SERVICE" <<EOF
+[Unit]
+Description=Stram Quant MCP consistent audit backup and checkpoint
+After=stram-quant-egress.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash $REPO_ROOT/deploy/stram_quant_siddu.sh backup-audit
+EOF
+  cat > "$BACKUP_TIMER" <<'EOF'
+[Unit]
+Description=Daily Stram Quant MCP audit backup
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=15m
+
+[Install]
+WantedBy=timers.target
+EOF
+  chmod 0644 "$BACKUP_SERVICE" "$BACKUP_TIMER"
+  chown root:root "$BACKUP_SERVICE" "$BACKUP_TIMER"
+  systemctl daemon-reload
+  systemctl enable --now stram-quant-audit-backup.timer
+  systemctl is-enabled --quiet stram-quant-audit-backup.timer || fail 'Audit backup timer is not persistent.'
+  pass 'daily persistent audit backup timer and 30-day staging retention are configured'
 }
 
 rollback() {
@@ -761,8 +1136,47 @@ rollback() {
   rm -f "$temporary"
   as_quant systemctl --user daemon-reload
   as_quant systemctl --user restart stram-quant-mcp.service
-  curl --retry 20 --retry-delay 1 --retry-connrefused --fail --silent --max-time 3 http://127.0.0.1:8800/health/ready >/dev/null || fail 'Rollback readiness failed.'
+  wait_for_mcp_readiness 30 || fail 'Rollback readiness failed.'
   pass 'previous digest restored readiness; audit backup/checkpoint preserved and lake was untouched'
+}
+
+restore_approved() {
+  require_root
+  local approved_image temporary
+  approved_image=$(env_value "$APPROVAL" APPROVED_IMAGE_REF)
+  digest_ref "$approved_image" || fail 'Approved image is not an immutable digest reference.'
+  as_quant podman image exists "$approved_image" || fail 'Approved image digest is not retained locally.'
+  probe_quant "$approved_image"
+  temporary=$(mktemp)
+  render_quant_quadlet "$approved_image" "$temporary"
+  cp --preserve=mode,ownership,timestamps "$QUANT_QUADLET" "$QUANT_QUADLET.rollback-drill"
+  install -o "$QUANT_USER" -g "$QUANT_USER" -m 0600 "$temporary" "$QUANT_QUADLET"
+  rm -f "$temporary"
+  as_quant systemctl --user daemon-reload
+  as_quant systemctl --user restart stram-quant-mcp.service
+  wait_for_mcp_readiness 30 || fail 'Approved-image recovery readiness failed.'
+  pass 'approved digest recovered after the rollback drill; audit volume and lake were preserved'
+}
+
+enable_services() {
+  require_root
+  [ "$(env_value "$APPROVAL" AUDIT_BACKUP_CHECKPOINT_RETENTION_VERIFIED)" = yes ] || fail 'Audit backup/checkpoint evidence is not approved.'
+  [ "$(env_value "$APPROVAL" ROLLBACK_IMAGE_AND_DRILL_VERIFIED)" = yes ] || fail 'Rollback/recovery drill evidence is not approved.'
+  verify
+  install -o root -g root -m 0400 /dev/null "$PERSISTENCE_MARKER"
+  auth_values
+  render_auth_quadlets
+  local approved_image temporary
+  approved_image=$(env_value "$APPROVAL" APPROVED_IMAGE_REF)
+  temporary=$(mktemp)
+  render_quant_quadlet "$approved_image" "$temporary"
+  install -o "$QUANT_USER" -g "$QUANT_USER" -m 0600 "$temporary" "$QUANT_QUADLET"
+  rm -f "$temporary"
+  as_auth systemctl --user daemon-reload
+  as_quant systemctl --user daemon-reload
+  as_auth systemctl --user is-enabled stram-keycloak-db.service stram-keycloak.service >/dev/null || fail 'Auth services are not persistent.'
+  as_quant systemctl --user is-enabled stram-quant-mcp.service >/dev/null || fail 'Quant service is not persistent.'
+  pass 'verified rootless Keycloak, PostgreSQL and Quant MCP services persist across reboot'
 }
 
 status() {
@@ -780,19 +1194,62 @@ status() {
   curl --max-time 3 --fail --silent http://127.0.0.1:8800/health/ready 2>/dev/null && printf '\n' || true
 }
 
+discovery_routes() {
+  # RFC 9728/8414 discovery paths must be reachable on the same HTTPS origin as /mcp and /realms.
+  # Usage: discovery-routes {status|apply|remove}. Mutation needs root plus explicit confirmation.
+  local mode=${2:-status} resource_path realm_path
+  require_command tailscale
+  auth_values
+  resource_path=$(python3 -c 'import sys,urllib.parse as u;print(u.urlsplit(sys.argv[1]).path)' "$MCP_RESOURCE_URL")
+  realm_path=$(python3 -c 'import sys,urllib.parse as u;print(u.urlsplit(sys.argv[1]).path)' "$MCP_ISSUER_URL")
+  local prm_path="/.well-known/oauth-protected-resource$resource_path"
+  local asm_path="/.well-known/oauth-authorization-server$realm_path"
+  case "$mode" in
+    status)
+      local serve_json
+      serve_json=$(tailscale serve status --json 2>/dev/null) || { not_verified 'Tailscale Serve state is unreadable'; return 0; }
+      for route in "$prm_path" "$asm_path"; do
+        if printf '%s' "$serve_json" | grep -qF "\"$route\""; then pass "Serve route present: $route"; else printf 'FAIL: Serve route missing: %s\n' "$route"; fi
+      done ;;
+    apply)
+      require_root
+      [ "${STRAM_CONFIRM_DISCOVERY_ROUTES:-}" = yes ] || fail 'Set STRAM_CONFIRM_DISCOVERY_ROUTES=yes after reviewing the routes.'
+      tailscale serve --bg --https=443 --set-path "$prm_path" "http://127.0.0.1:8800$prm_path"
+      tailscale serve --bg --https=443 --set-path "$asm_path" "http://127.0.0.1:9080$realm_path/.well-known/oauth-authorization-server"
+      pass 'discovery routes added; existing /mcp and /realms routes were not modified' ;;
+    remove)
+      require_root
+      [ "${STRAM_CONFIRM_DISCOVERY_ROUTES:-}" = yes ] || fail 'Set STRAM_CONFIRM_DISCOVERY_ROUTES=yes to remove the routes.'
+      tailscale serve --https=443 --set-path "$prm_path" off
+      tailscale serve --https=443 --set-path "$asm_path" off
+      pass 'discovery routes removed; existing /mcp and /realms routes were not modified' ;;
+    *) fail 'discovery-routes accepts status, apply or remove.' ;;
+  esac
+}
+
 case "$ACTION" in
   doctor) doctor ;;
   prepare) prepare ;;
+  provision-auth) provision_auth ;;
+  import-images) import_images ;;
   auth-prepare) auth_prepare ;;
+  install-egress) install_egress ;;
   auth-start) auth_start ;;
   auth-verify) auth_verify ;;
+  prepare-acceptance) prepare_acceptance ;;
   activate) activate ;;
   verify) verify ;;
+  reliability-drill) reliability_drill ;;
   backup-audit) backup_audit ;;
+  verify-backup) verify_backup ;;
+  install-backup-timer) install_backup_timer ;;
   rollback) rollback ;;
+  restore-approved) restore_approved ;;
+  enable-services) enable_services ;;
+  discovery-routes) discovery_routes "$@" ;;
   status) status ;;
   *)
-    printf 'Usage: sudo bash %s {doctor|prepare|auth-prepare|auth-start|auth-verify|activate|verify|backup-audit|rollback|status}\n' "$0" >&2
+    printf 'Usage: sudo bash %s {doctor|prepare|provision-auth|import-images|auth-prepare|install-egress|auth-start|auth-verify|prepare-acceptance|activate|verify|reliability-drill|backup-audit|verify-backup|install-backup-timer|rollback|restore-approved|enable-services|discovery-routes|status}\n' "$0" >&2
     exit 2
     ;;
 esac

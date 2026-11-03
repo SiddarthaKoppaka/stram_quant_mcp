@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# KEYCLOAK_BASE must be the reviewed 26.7.4 multi-arch manifest digest.
+# KEYCLOAK_BASE must be a reviewed Keycloak 26 immutable image digest.
 ARG KEYCLOAK_BASE
 FROM ${KEYCLOAK_BASE} AS builder
 
