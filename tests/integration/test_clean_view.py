@@ -11,7 +11,6 @@ from typing import Any
 import pytest
 from pydantic import JsonValue
 
-from stram_quant_mcp.clean_views import LIMIT_FILLED, NO_EVENTS, NO_ROWS
 from stram_quant_mcp.errors import ToolInputError
 from stram_quant_mcp.tool_adapter import QuantToolAdapter
 from stram_quant_mcp.tool_models import (
@@ -134,7 +133,8 @@ def test_a_catalog_that_fills_the_limit_says_more_may_exist(
     clean = CleanCatalogData.model_validate(_clean(tool_adapter, "quant_list_series", {"limit": 1}))
 
     assert (clean.count, clean.limit_filled) == (1, True)
-    assert clean.explanation == LIMIT_FILLED
+    assert clean.explanation is not None
+    assert "more entries may exist" in clean.explanation
 
 
 def test_a_catalog_below_the_limit_is_not_called_filled(tool_adapter: QuantToolAdapter) -> None:
@@ -254,7 +254,9 @@ def test_an_empty_window_explains_itself(tool_adapter: QuantToolAdapter) -> None
     clean = CleanSeriesData.model_validate(_clean(tool_adapter, "quant_get_series", empty))
 
     assert clean.series == ()
-    assert clean.explanation == NO_ROWS
+    assert clean.explanation is not None
+    assert "No rows matched" in clean.explanation
+    assert "known_since" in clean.explanation
 
 
 def test_a_study_without_events_explains_itself(tool_adapter: QuantToolAdapter) -> None:
@@ -268,7 +270,9 @@ def test_a_study_without_events_explains_itself(tool_adapter: QuantToolAdapter) 
     )
 
     assert clean.event_count == 0
-    assert clean.explanation == NO_EVENTS
+    assert clean.explanation is not None
+    assert "never held" in clean.explanation
+    assert "baseline" in clean.explanation
 
 
 def test_an_unknown_view_is_rejected(tool_adapter: QuantToolAdapter) -> None:

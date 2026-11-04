@@ -6,9 +6,6 @@ import pytest
 from stram_data.data_interface import ConditionalReturnsResult
 
 from stram_quant_mcp.clean_views import (
-    MOSTLY_UNDETERMINED,
-    NO_EVALUATED_DAYS,
-    NO_EVENTS,
     exact,
     frequency,
     study_explanation,
@@ -68,14 +65,20 @@ def _study(evaluated: int, undetermined: int, events: int) -> ConditionalReturns
 @pytest.mark.parametrize(
     ("evaluated", "undetermined", "events", "expected"),
     [
-        (0, 0, 0, NO_EVALUATED_DAYS),
-        (127, 126, 0, MOSTLY_UNDETERMINED),
-        (10, 6, 2, MOSTLY_UNDETERMINED),
-        (10, 5, 0, NO_EVENTS),
-        (10, 5, 3, None),
+        (0, 0, 0, "No trading days in the window could be evaluated"),
+        (127, 126, 0, "Most days in the window were undetermined"),
+        (10, 6, 2, "Most days in the window were undetermined"),
+        (10, 5, 0, "The condition never held on an evaluated day"),
     ],
 )
 def teststudy_explanations_count_undetermined_days_within_the_window(
-    evaluated: int, undetermined: int, events: int, expected: str | None
+    evaluated: int, undetermined: int, events: int, expected: str
 ) -> None:
-    assert study_explanation(_study(evaluated, undetermined, events)) == expected
+    explanation = study_explanation(_study(evaluated, undetermined, events))
+
+    assert explanation is not None
+    assert explanation.startswith(expected)
+
+
+def test_a_study_with_events_and_known_days_needs_no_explanation() -> None:
+    assert study_explanation(_study(10, 5, 3)) is None
