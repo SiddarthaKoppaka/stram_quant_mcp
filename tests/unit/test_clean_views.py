@@ -3,8 +3,16 @@ from __future__ import annotations
 from decimal import Decimal, localcontext
 
 import pytest
+from stram_data.data_interface import ConditionalReturnsResult
 
-from stram_quant_mcp.clean_views import exact, frequency
+from stram_quant_mcp.clean_views import (
+    MOSTLY_UNDETERMINED,
+    NO_EVALUATED_DAYS,
+    NO_EVENTS,
+    exact,
+    frequency,
+    study_explanation,
+)
 
 
 @pytest.mark.parametrize(
@@ -49,3 +57,25 @@ def test_frequency_spellings_become_one_word(spelling: str, expected: str) -> No
 def test_unknown_frequency_is_kept_as_given() -> None:
     assert frequency("every full moon") == "every full moon"
     assert frequency(None) is None
+
+
+def _study(evaluated: int, undetermined: int, events: int) -> ConditionalReturnsResult:
+    return ConditionalReturnsResult.model_construct(
+        evaluated_days=evaluated, undetermined_days=undetermined, event_count=events
+    )
+
+
+@pytest.mark.parametrize(
+    ("evaluated", "undetermined", "events", "expected"),
+    [
+        (0, 0, 0, NO_EVALUATED_DAYS),
+        (127, 126, 0, MOSTLY_UNDETERMINED),
+        (10, 6, 2, MOSTLY_UNDETERMINED),
+        (10, 5, 0, NO_EVENTS),
+        (10, 5, 3, None),
+    ],
+)
+def teststudy_explanations_count_undetermined_days_within_the_window(
+    evaluated: int, undetermined: int, events: int, expected: str | None
+) -> None:
+    assert study_explanation(_study(evaluated, undetermined, events)) == expected

@@ -25,7 +25,8 @@ from stram_data.data_interface import (
     SeriesRow,
 )
 
-from stram_quant_mcp.clean_models import (
+from stram_quant_mcp.tool_models import (
+    CatalogData,
     CleanCatalogData,
     CleanConditionalReturnsData,
     CleanDerivedData,
@@ -37,7 +38,6 @@ from stram_quant_mcp.clean_models import (
     CleanSeriesData,
     Row,
 )
-from stram_quant_mcp.tool_models import CatalogData
 
 # Spellings of one frequency seen across providers. The raw spelling is always kept beside it.
 FREQUENCIES = {
@@ -358,11 +358,16 @@ def clean_conditional_returns(data: ConditionalReturnsResult) -> CleanConditiona
         notes=data.notes,
         availability_note=data.availability_note,
         availability=data.availability,
-        explanation=_study_explanation(data),
+        explanation=study_explanation(data),
     )
 
 
-def _study_explanation(data: ConditionalReturnsResult) -> str | None:
+def study_explanation(data: ConditionalReturnsResult) -> str | None:
+    """Say why a study has nothing to measure.
+
+    The Data Interface counts undetermined days within the evaluated window, so "mostly
+    undetermined" compares them with half of ``evaluated_days``.
+    """
     if data.evaluated_days == 0:
         return NO_EVALUATED_DAYS
     if data.undetermined_days * 2 > data.evaluated_days:

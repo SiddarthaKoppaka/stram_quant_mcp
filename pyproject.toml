@@ -155,8 +155,7 @@ layers = [
   "clean_views",
   "tool_registry",
   "tool_models",
-  "clean_models",
-  "settings | errors | request_context | contract_base",
+  "settings | errors | request_context",
 ]
 exhaustive = false
 

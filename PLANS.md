@@ -229,12 +229,13 @@ the operator performs that single terminal authentication; the three new service
   tests do. Shared fields move into the group; IDs, timestamps, lineage IDs and availability evidence stay on each
   row; absent and null panel cells stay distinct; decimals lose trailing zeros as text only. Nothing is computed
   except counts of the returned rows. A first, lossy revision was rejected in review for dropping evidence.
-- Import layers (ENGINEERING.md 3.2): three modules are added. `contract_base` holds `ContractModel` and the shared
-  literals, moved out of `tool_models` so `clean_models` can use them without a cycle; it sits with the shared
-  foundations. `clean_models` holds only closed output models and sits directly under `tool_models`, which
-  references it in the output unions. `clean_views` holds the reshaping functions and sits directly under
-  `tool_adapter`, its only caller, and above `tool_registry`, because it reads the raw result models. Neither imports
-  upward, and `lint-imports` enforces the order.
+- Import layers (ENGINEERING.md 3.2): one module is added. The closed clean output models live in `tool_models`
+  beside the raw ones, since both are tool output contracts, so no existing code moves. `clean_views` holds the
+  reshaping functions and sits directly under `tool_adapter`, its only caller, and above `tool_registry`, because
+  it reads the raw result models and `tool_models`. It imports nothing above it, and `lint-imports` enforces the
+  order.
+- Explanations never infer. "Mostly undetermined" means `undetermined_days` is more than half of `evaluated_days`;
+  the Data Interface counts undetermined days within the evaluated window (`stram_data` 1.3.1, `service.py`).
 - Evidence: 254 tests pass, including golden rebuilds for all five tools. On the real lake the clean view is 49% to 64%
   of raw for series, derived, panel and catalog results.
 
