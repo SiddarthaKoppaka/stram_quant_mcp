@@ -34,6 +34,15 @@
             "minimum": 1,
             "title": "Limit",
             "type": "integer"
+          },
+          "view": {
+            "default": "raw",
+            "enum": [
+              "raw",
+              "clean"
+            ],
+            "title": "View",
+            "type": "string"
           }
         },
         "title": "CatalogInput",
@@ -140,12 +149,102 @@
             ],
             "title": "CatalogEntry",
             "type": "object"
+          },
+          "CleanCatalogData": {
+            "additionalProperties": false,
+            "description": "Series metadata as one table, with counts by dataset and provider.",
+            "properties": {
+              "by_dataset": {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "title": "By Dataset",
+                "type": "object"
+              },
+              "by_provider": {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "title": "By Provider",
+                "type": "object"
+              },
+              "columns": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Columns",
+                "type": "array"
+              },
+              "count": {
+                "title": "Count",
+                "type": "integer"
+              },
+              "limit": {
+                "title": "Limit",
+                "type": "integer"
+              },
+              "limit_reached": {
+                "title": "Limit Reached",
+                "type": "boolean"
+              },
+              "rows": {
+                "items": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "type": "array"
+                },
+                "title": "Rows",
+                "type": "array"
+              },
+              "view": {
+                "const": "clean",
+                "title": "View",
+                "type": "string"
+              }
+            },
+            "required": [
+              "view",
+              "columns",
+              "rows",
+              "count",
+              "limit",
+              "limit_reached",
+              "by_dataset",
+              "by_provider"
+            ],
+            "title": "CleanCatalogData",
+            "type": "object"
           }
         },
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/$defs/CatalogData"
+            "anyOf": [
+              {
+                "$ref": "#/$defs/CatalogData"
+              },
+              {
+                "$ref": "#/$defs/CleanCatalogData"
+              }
+            ],
+            "title": "Data"
           },
           "interface_version": {
             "title": "Interface Version",
@@ -184,10 +283,10 @@
           "request_id",
           "data"
         ],
-        "title": "ToolEnvelope[CatalogData]",
+        "title": "ToolEnvelope[Union[CatalogData, CleanCatalogData]]",
         "type": "object"
       },
-      "schemaHash": "ff9f487ee91ef97b590fae1245ee50db3aa1b3267182257256e59dea81aba383",
+      "schemaHash": "c5585e999a886f0f65ceafa7317ae2605113220153ca2f5519fd82d6ceef53c8",
       "scope": "quant:discover"
     },
     {
@@ -883,6 +982,15 @@
             "format": "date",
             "title": "Start Date",
             "type": "string"
+          },
+          "view": {
+            "default": "raw",
+            "enum": [
+              "raw",
+              "clean"
+            ],
+            "title": "View",
+            "type": "string"
           }
         },
         "required": [
@@ -944,6 +1052,211 @@
               }
             },
             "title": "AvailabilitySummary",
+            "type": "object"
+          },
+          "CleanAvailability": {
+            "additionalProperties": false,
+            "description": "The availability summary, without the policy texts the discovery tools already give.",
+            "properties": {
+              "hindsight_only": {
+                "title": "Hindsight Only",
+                "type": "boolean"
+              },
+              "mode": {
+                "enum": [
+                  "strict",
+                  "estimated",
+                  "ex_post"
+                ],
+                "title": "Mode",
+                "type": "string"
+              },
+              "unavailable_rows": {
+                "title": "Unavailable Rows",
+                "type": "integer"
+              },
+              "uncovered": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Uncovered",
+                "type": "array"
+              },
+              "warnings": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Warnings",
+                "type": "array"
+              }
+            },
+            "required": [
+              "mode",
+              "hindsight_only",
+              "unavailable_rows",
+              "uncovered",
+              "warnings"
+            ],
+            "title": "CleanAvailability",
+            "type": "object"
+          },
+          "CleanSeries": {
+            "additionalProperties": false,
+            "description": "One series, with its shared fields once and a row per observation.",
+            "properties": {
+              "columns": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Columns",
+                "type": "array"
+              },
+              "dataset": {
+                "title": "Dataset",
+                "type": "string"
+              },
+              "indicator_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Indicator Id"
+              },
+              "kind": {
+                "title": "Kind",
+                "type": "string"
+              },
+              "provider": {
+                "title": "Provider",
+                "type": "string"
+              },
+              "rows": {
+                "items": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "type": "array"
+                },
+                "title": "Rows",
+                "type": "array"
+              },
+              "series_key": {
+                "title": "Series Key",
+                "type": "string"
+              },
+              "unit": {
+                "title": "Unit",
+                "type": "string"
+              }
+            },
+            "required": [
+              "series_key",
+              "dataset",
+              "kind",
+              "provider",
+              "unit",
+              "indicator_id",
+              "columns",
+              "rows"
+            ],
+            "title": "CleanSeries",
+            "type": "object"
+          },
+          "CleanSeriesData": {
+            "additionalProperties": false,
+            "description": "Series rows grouped by series.",
+            "properties": {
+              "all_versions": {
+                "title": "All Versions",
+                "type": "boolean"
+              },
+              "as_of": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "As Of"
+              },
+              "availability": {
+                "$ref": "#/$defs/CleanAvailability"
+              },
+              "availability_note": {
+                "title": "Availability Note",
+                "type": "string"
+              },
+              "count": {
+                "title": "Count",
+                "type": "integer"
+              },
+              "explanation": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Explanation"
+              },
+              "limit": {
+                "title": "Limit",
+                "type": "integer"
+              },
+              "series": {
+                "items": {
+                  "$ref": "#/$defs/CleanSeries"
+                },
+                "title": "Series",
+                "type": "array"
+              },
+              "truncated": {
+                "title": "Truncated",
+                "type": "boolean"
+              },
+              "view": {
+                "const": "clean",
+                "title": "View",
+                "type": "string"
+              }
+            },
+            "required": [
+              "view",
+              "series",
+              "count",
+              "limit",
+              "truncated",
+              "as_of",
+              "all_versions",
+              "availability_note",
+              "availability"
+            ],
+            "title": "CleanSeriesData",
             "type": "object"
           },
           "PolicyInfo": {
@@ -1336,7 +1649,15 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/$defs/SeriesResult"
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SeriesResult"
+              },
+              {
+                "$ref": "#/$defs/CleanSeriesData"
+              }
+            ],
+            "title": "Data"
           },
           "interface_version": {
             "title": "Interface Version",
@@ -1375,10 +1696,10 @@
           "request_id",
           "data"
         ],
-        "title": "ToolEnvelope[SeriesResult]",
+        "title": "ToolEnvelope[Union[SeriesResult, CleanSeriesData]]",
         "type": "object"
       },
-      "schemaHash": "68dd28b057c2904e18e907b5268bc1b4835d825d9885c3c41c04cdc4ae9b0899",
+      "schemaHash": "2fe1973f6f67977d79f06a657cb4e7fac1b441449af7c880938dbf7d99dfa574",
       "scope": "quant:read"
     },
     {
@@ -1453,6 +1774,15 @@
             ],
             "default": null,
             "title": "Subject"
+          },
+          "view": {
+            "default": "raw",
+            "enum": [
+              "raw",
+              "clean"
+            ],
+            "title": "View",
+            "type": "string"
           }
         },
         "required": [
@@ -1515,6 +1845,220 @@
               }
             },
             "title": "AvailabilitySummary",
+            "type": "object"
+          },
+          "CleanAvailability": {
+            "additionalProperties": false,
+            "description": "The availability summary, without the policy texts the discovery tools already give.",
+            "properties": {
+              "hindsight_only": {
+                "title": "Hindsight Only",
+                "type": "boolean"
+              },
+              "mode": {
+                "enum": [
+                  "strict",
+                  "estimated",
+                  "ex_post"
+                ],
+                "title": "Mode",
+                "type": "string"
+              },
+              "unavailable_rows": {
+                "title": "Unavailable Rows",
+                "type": "integer"
+              },
+              "uncovered": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Uncovered",
+                "type": "array"
+              },
+              "warnings": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Warnings",
+                "type": "array"
+              }
+            },
+            "required": [
+              "mode",
+              "hindsight_only",
+              "unavailable_rows",
+              "uncovered",
+              "warnings"
+            ],
+            "title": "CleanAvailability",
+            "type": "object"
+          },
+          "CleanDerivedData": {
+            "additionalProperties": false,
+            "description": "Derived rows grouped by indicator and subject; ``event_id`` resolves through lineage.",
+            "properties": {
+              "as_of": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "As Of"
+              },
+              "availability": {
+                "$ref": "#/$defs/CleanAvailability"
+              },
+              "availability_note": {
+                "title": "Availability Note",
+                "type": "string"
+              },
+              "count": {
+                "title": "Count",
+                "type": "integer"
+              },
+              "explanation": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Explanation"
+              },
+              "groups": {
+                "items": {
+                  "$ref": "#/$defs/CleanDerivedGroup"
+                },
+                "title": "Groups",
+                "type": "array"
+              },
+              "limit": {
+                "title": "Limit",
+                "type": "integer"
+              },
+              "truncated": {
+                "title": "Truncated",
+                "type": "boolean"
+              },
+              "view": {
+                "const": "clean",
+                "title": "View",
+                "type": "string"
+              }
+            },
+            "required": [
+              "view",
+              "groups",
+              "count",
+              "limit",
+              "truncated",
+              "as_of",
+              "availability_note",
+              "availability"
+            ],
+            "title": "CleanDerivedData",
+            "type": "object"
+          },
+          "CleanDerivedGroup": {
+            "additionalProperties": false,
+            "description": "One derived indicator for one subject, with its definition once.",
+            "properties": {
+              "availability_basis": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Availability Basis"
+              },
+              "columns": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Columns",
+                "type": "array"
+              },
+              "formula": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Formula"
+              },
+              "indicator_id": {
+                "title": "Indicator Id",
+                "type": "string"
+              },
+              "indicator_version": {
+                "title": "Indicator Version",
+                "type": "string"
+              },
+              "rows": {
+                "items": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "type": "array"
+                },
+                "title": "Rows",
+                "type": "array"
+              },
+              "subject": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Subject"
+              },
+              "unit": {
+                "title": "Unit",
+                "type": "string"
+              }
+            },
+            "required": [
+              "indicator_id",
+              "indicator_version",
+              "subject",
+              "unit",
+              "formula",
+              "availability_basis",
+              "columns",
+              "rows"
+            ],
+            "title": "CleanDerivedGroup",
             "type": "object"
           },
           "DerivedResult": {
@@ -1921,7 +2465,15 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/$defs/DerivedResult"
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DerivedResult"
+              },
+              {
+                "$ref": "#/$defs/CleanDerivedData"
+              }
+            ],
+            "title": "Data"
           },
           "interface_version": {
             "title": "Interface Version",
@@ -1960,10 +2512,10 @@
           "request_id",
           "data"
         ],
-        "title": "ToolEnvelope[DerivedResult]",
+        "title": "ToolEnvelope[Union[DerivedResult, CleanDerivedData]]",
         "type": "object"
       },
-      "schemaHash": "5c909e7ae41d48a62640119302051e1d7716b1f3635cb7d5a7e197d0c1cd510b",
+      "schemaHash": "5f72eb6a452eafe835b8438e9aa6c3c102ca0d0b35b1293876b006eadc26db3c",
       "scope": "quant:read"
     },
     {
@@ -2498,6 +3050,15 @@
             "format": "date",
             "title": "Start Date",
             "type": "string"
+          },
+          "view": {
+            "default": "raw",
+            "enum": [
+              "raw",
+              "clean"
+            ],
+            "title": "View",
+            "type": "string"
           }
         },
         "required": [
@@ -2560,6 +3121,250 @@
               }
             },
             "title": "AvailabilitySummary",
+            "type": "object"
+          },
+          "CleanAvailability": {
+            "additionalProperties": false,
+            "description": "The availability summary, without the policy texts the discovery tools already give.",
+            "properties": {
+              "hindsight_only": {
+                "title": "Hindsight Only",
+                "type": "boolean"
+              },
+              "mode": {
+                "enum": [
+                  "strict",
+                  "estimated",
+                  "ex_post"
+                ],
+                "title": "Mode",
+                "type": "string"
+              },
+              "unavailable_rows": {
+                "title": "Unavailable Rows",
+                "type": "integer"
+              },
+              "uncovered": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Uncovered",
+                "type": "array"
+              },
+              "warnings": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Warnings",
+                "type": "array"
+              }
+            },
+            "required": [
+              "mode",
+              "hindsight_only",
+              "unavailable_rows",
+              "uncovered",
+              "warnings"
+            ],
+            "title": "CleanAvailability",
+            "type": "object"
+          },
+          "CleanPanelColumn": {
+            "additionalProperties": false,
+            "description": "What the cells of one panel column hold, without repeating it in every cell.",
+            "properties": {
+              "filled_cells": {
+                "title": "Filled Cells",
+                "type": "integer"
+              },
+              "known_since_first": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Known Since First"
+              },
+              "known_since_last": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Known Since Last"
+              },
+              "missing_cells": {
+                "title": "Missing Cells",
+                "type": "integer"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "stale_cells": {
+                "title": "Stale Cells",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "name",
+              "missing_cells",
+              "filled_cells",
+              "stale_cells",
+              "known_since_first",
+              "known_since_last"
+            ],
+            "title": "CleanPanelColumn",
+            "type": "object"
+          },
+          "CleanPanelData": {
+            "additionalProperties": false,
+            "description": "The aligned panel as a table: one row per date, one value per column.",
+            "properties": {
+              "as_of": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "As Of"
+              },
+              "availability": {
+                "$ref": "#/$defs/CleanAvailability"
+              },
+              "availability_note": {
+                "title": "Availability Note",
+                "type": "string"
+              },
+              "calendar": {
+                "title": "Calendar",
+                "type": "string"
+              },
+              "column_details": {
+                "items": {
+                  "$ref": "#/$defs/CleanPanelColumn"
+                },
+                "title": "Column Details",
+                "type": "array"
+              },
+              "columns": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Columns",
+                "type": "array"
+              },
+              "count": {
+                "title": "Count",
+                "type": "integer"
+              },
+              "explanation": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Explanation"
+              },
+              "fill": {
+                "title": "Fill",
+                "type": "string"
+              },
+              "filled_or_stale": {
+                "default": [],
+                "items": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "type": "array"
+                },
+                "title": "Filled Or Stale",
+                "type": "array"
+              },
+              "limit": {
+                "title": "Limit",
+                "type": "integer"
+              },
+              "rows": {
+                "items": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "type": "array"
+                },
+                "title": "Rows",
+                "type": "array"
+              },
+              "truncated": {
+                "title": "Truncated",
+                "type": "boolean"
+              },
+              "view": {
+                "const": "clean",
+                "title": "View",
+                "type": "string"
+              }
+            },
+            "required": [
+              "view",
+              "columns",
+              "rows",
+              "column_details",
+              "count",
+              "limit",
+              "truncated",
+              "as_of",
+              "calendar",
+              "fill",
+              "availability_note",
+              "availability"
+            ],
+            "title": "CleanPanelData",
             "type": "object"
           },
           "PanelCell": {
@@ -2933,7 +3738,15 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/$defs/PanelResult"
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PanelResult"
+              },
+              {
+                "$ref": "#/$defs/CleanPanelData"
+              }
+            ],
+            "title": "Data"
           },
           "interface_version": {
             "title": "Interface Version",
@@ -2972,10 +3785,10 @@
           "request_id",
           "data"
         ],
-        "title": "ToolEnvelope[PanelResult]",
+        "title": "ToolEnvelope[Union[PanelResult, CleanPanelData]]",
         "type": "object"
       },
-      "schemaHash": "1bf03035bec3f7ebf5ad01b4d62e5721f932d10d04b9e70a97b06644d368bf6a",
+      "schemaHash": "301a97a91f8dc56ef9729d43ef9d62dc86e08dcf3fd6215b7105249cdd79a97b",
       "scope": "quant:analytics"
     },
     {
@@ -3135,6 +3948,15 @@
             ],
             "title": "Trigger",
             "type": "string"
+          },
+          "view": {
+            "default": "raw",
+            "enum": [
+              "raw",
+              "clean"
+            ],
+            "title": "View",
+            "type": "string"
           }
         },
         "required": [
@@ -3198,6 +4020,320 @@
               }
             },
             "title": "AvailabilitySummary",
+            "type": "object"
+          },
+          "CleanAvailability": {
+            "additionalProperties": false,
+            "description": "The availability summary, without the policy texts the discovery tools already give.",
+            "properties": {
+              "hindsight_only": {
+                "title": "Hindsight Only",
+                "type": "boolean"
+              },
+              "mode": {
+                "enum": [
+                  "strict",
+                  "estimated",
+                  "ex_post"
+                ],
+                "title": "Mode",
+                "type": "string"
+              },
+              "unavailable_rows": {
+                "title": "Unavailable Rows",
+                "type": "integer"
+              },
+              "uncovered": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Uncovered",
+                "type": "array"
+              },
+              "warnings": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Warnings",
+                "type": "array"
+              }
+            },
+            "required": [
+              "mode",
+              "hindsight_only",
+              "unavailable_rows",
+              "uncovered",
+              "warnings"
+            ],
+            "title": "CleanAvailability",
+            "type": "object"
+          },
+          "CleanConditionalReturnsData": {
+            "additionalProperties": false,
+            "description": "A conditional-returns study with outcomes and baseline merged per horizon.",
+            "properties": {
+              "as_of": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "As Of"
+              },
+              "availability": {
+                "$ref": "#/$defs/CleanAvailability"
+              },
+              "availability_note": {
+                "title": "Availability Note",
+                "type": "string"
+              },
+              "entry": {
+                "title": "Entry",
+                "type": "string"
+              },
+              "evaluated_days": {
+                "title": "Evaluated Days",
+                "type": "integer"
+              },
+              "event_columns": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Event Columns",
+                "type": "array"
+              },
+              "event_count": {
+                "title": "Event Count",
+                "type": "integer"
+              },
+              "events": {
+                "items": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "type": "array"
+                },
+                "title": "Events",
+                "type": "array"
+              },
+              "explanation": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Explanation"
+              },
+              "horizons": {
+                "items": {
+                  "$ref": "#/$defs/CleanHorizon"
+                },
+                "title": "Horizons",
+                "type": "array"
+              },
+              "notes": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Notes",
+                "type": "array"
+              },
+              "state_days": {
+                "title": "State Days",
+                "type": "integer"
+              },
+              "target_symbol": {
+                "title": "Target Symbol",
+                "type": "string"
+              },
+              "trigger": {
+                "title": "Trigger",
+                "type": "string"
+              },
+              "truncated": {
+                "title": "Truncated",
+                "type": "boolean"
+              },
+              "undetermined_days": {
+                "title": "Undetermined Days",
+                "type": "integer"
+              },
+              "view": {
+                "const": "clean",
+                "title": "View",
+                "type": "string"
+              }
+            },
+            "required": [
+              "view",
+              "target_symbol",
+              "trigger",
+              "entry",
+              "as_of",
+              "evaluated_days",
+              "undetermined_days",
+              "state_days",
+              "event_count",
+              "horizons",
+              "event_columns",
+              "events",
+              "truncated",
+              "notes",
+              "availability_note",
+              "availability"
+            ],
+            "title": "CleanConditionalReturnsData",
+            "type": "object"
+          },
+          "CleanHorizon": {
+            "additionalProperties": false,
+            "description": "The conditional outcome and its baseline for one horizon, side by side.",
+            "properties": {
+              "baseline_hit_rate": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Baseline Hit Rate"
+              },
+              "baseline_mean": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Baseline Mean"
+              },
+              "baseline_median": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Baseline Median"
+              },
+              "baseline_observations": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Baseline Observations"
+              },
+              "hit_rate": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Hit Rate"
+              },
+              "horizon": {
+                "title": "Horizon",
+                "type": "integer"
+              },
+              "maximum": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Maximum"
+              },
+              "mean": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Mean"
+              },
+              "median": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Median"
+              },
+              "minimum": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Minimum"
+              },
+              "observations": {
+                "title": "Observations",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "horizon",
+              "observations",
+              "mean",
+              "median",
+              "hit_rate",
+              "minimum",
+              "maximum",
+              "baseline_observations",
+              "baseline_mean",
+              "baseline_median",
+              "baseline_hit_rate"
+            ],
+            "title": "CleanHorizon",
             "type": "object"
           },
           "ConditionValue": {
@@ -3792,7 +4928,15 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/$defs/ConditionalReturnsResult"
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ConditionalReturnsResult"
+              },
+              {
+                "$ref": "#/$defs/CleanConditionalReturnsData"
+              }
+            ],
+            "title": "Data"
           },
           "interface_version": {
             "title": "Interface Version",
@@ -3831,10 +4975,10 @@
           "request_id",
           "data"
         ],
-        "title": "ToolEnvelope[ConditionalReturnsResult]",
+        "title": "ToolEnvelope[Union[ConditionalReturnsResult, CleanConditionalReturnsData]]",
         "type": "object"
       },
-      "schemaHash": "697e6908b3be4fe65ad65782991423f24e18ca50c8f044540d7c68193fc72a93",
+      "schemaHash": "c9fecb3b7ea0c3770546f7090c5093c03c6fc4c7fb96f9049b1102a9d90845f7",
       "scope": "quant:analytics"
     }
   ]

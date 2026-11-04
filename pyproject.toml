@@ -152,9 +152,11 @@ layers = [
   "policy | access_policy | denial_throttle",
   "worker",
   "tool_adapter",
+  "clean_views",
   "tool_registry",
   "tool_models",
-  "settings | errors | request_context",
+  "clean_models",
+  "settings | errors | request_context | contract_base",
 ]
 exhaustive = false
 

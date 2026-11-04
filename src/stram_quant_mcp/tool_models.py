@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 from stram_data.data_interface import (
     CatalogEntry,
     ConditionalReturnsResult,
@@ -19,24 +19,26 @@ from stram_data.data_interface import (
     SeriesResult,
 )
 
+from stram_quant_mcp.clean_models import (
+    CleanCatalogData,
+    CleanConditionalReturnsData,
+    CleanDerivedData,
+    CleanPanelData,
+    CleanSeriesData,
+)
+from stram_quant_mcp.contract_base import AvailabilityMode, ContractModel, ViewMode
+
 MAX_SPAN_DAYS = 1830
 MAX_RESULT_ROWS = 500
 DEFAULT_RESULT_ROWS = 100
 MAX_CATALOG_ROWS = 500
 
-AvailabilityMode = Literal["strict", "estimated", "ex_post"]
 Dataset = Literal["economic_observation", "market_bar", "positioning_report"]
 Kind = Literal["economic", "rates", "market_bar", "positioning", "derived"]
 Key = Annotated[
     str,
     StringConstraints(min_length=1, max_length=100, pattern=r"^[A-Za-z0-9_.:\-^=/ ]+$"),
 ]
-
-
-class ContractModel(BaseModel):
-    """Immutable transport contract that rejects undeclared fields."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
 
 class EmptyInput(ContractModel):
@@ -46,6 +48,7 @@ class EmptyInput(ContractModel):
 class CatalogInput(ContractModel):
     dataset: Dataset | None = None
     limit: int = Field(default=100, ge=1, le=MAX_CATALOG_ROWS)
+    view: ViewMode = "raw"
 
 
 class IndicatorSubjectsInput(ContractModel):
@@ -80,6 +83,7 @@ class SeriesInput(DateRangeInput):
     all_versions: bool = False
     limit: int = Field(default=DEFAULT_RESULT_ROWS, ge=1, le=MAX_RESULT_ROWS)
     availability: AvailabilityMode = "strict"
+    view: ViewMode = "raw"
 
     @model_validator(mode="after")
     def validate_filters_and_mode(self) -> SeriesInput:
@@ -98,6 +102,7 @@ class DerivedInput(DateRangeInput):
     as_of: date | None = None
     limit: int = Field(default=DEFAULT_RESULT_ROWS, ge=1, le=MAX_RESULT_ROWS)
     availability: AvailabilityMode = "strict"
+    view: ViewMode = "raw"
 
     @model_validator(mode="after")
     def validate_mode(self) -> DerivedInput:
@@ -130,6 +135,7 @@ class PanelInput(DateRangeInput):
     max_staleness_days: int = Field(default=0, ge=0, le=366)
     limit: int = Field(default=DEFAULT_RESULT_ROWS, ge=1, le=MAX_RESULT_ROWS)
     availability: AvailabilityMode = "strict"
+    view: ViewMode = "raw"
 
     @model_validator(mode="after")
     def validate_panel(self) -> PanelInput:
@@ -171,6 +177,7 @@ class ConditionalReturnsInput(DateRangeInput):
     as_of: date | None = None
     limit: int = Field(default=DEFAULT_RESULT_ROWS, ge=1, le=200)
     availability: AvailabilityMode = "strict"
+    view: ViewMode = "raw"
 
     @model_validator(mode="after")
     def validate_study(self) -> ConditionalReturnsInput:
@@ -211,13 +218,13 @@ class ToolEnvelope[DataT: BaseModel](ContractModel):
     warnings: tuple[str, ...] = ()
 
 
-CatalogEnvelope = ToolEnvelope[CatalogData]
+CatalogEnvelope = ToolEnvelope[CatalogData | CleanCatalogData]
 IndicatorsEnvelope = ToolEnvelope[IndicatorsData]
 IndicatorSubjectsEnvelope = ToolEnvelope[IndicatorSubjectsData]
 AvailabilityPoliciesEnvelope = ToolEnvelope[AvailabilityPoliciesData]
 FreshnessEnvelope = ToolEnvelope[FreshnessReport]
-SeriesEnvelope = ToolEnvelope[SeriesResult]
-DerivedEnvelope = ToolEnvelope[DerivedResult]
+SeriesEnvelope = ToolEnvelope[SeriesResult | CleanSeriesData]
+DerivedEnvelope = ToolEnvelope[DerivedResult | CleanDerivedData]
 LineageEnvelope = ToolEnvelope[LineageResult]
-PanelEnvelope = ToolEnvelope[PanelResult]
-ConditionalReturnsEnvelope = ToolEnvelope[ConditionalReturnsResult]
+PanelEnvelope = ToolEnvelope[PanelResult | CleanPanelData]
+ConditionalReturnsEnvelope = ToolEnvelope[ConditionalReturnsResult | CleanConditionalReturnsData]

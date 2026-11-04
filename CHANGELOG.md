@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased — FastMCP server
+## Unreleased — clean view
+
+- Adds an optional `view` input, `raw` (the default) or `clean`, to `quant_list_series`,
+  `quant_get_series`, `quant_get_derived`, `quant_get_aligned_panel` and
+  `quant_get_conditional_returns`. The raw result is unchanged. The clean result holds the same
+  values in a shape sized for agents: shared fields once per series, rows as short tuples, exact
+  decimals without trailing zeros, one spelling per frequency, catalog counts by dataset and provider,
+  and a plain explanation when a result is empty or mostly undetermined. No value is computed;
+  golden tests compare every clean value with its raw value.
+- The five tools' input and output schemas, and so their schema hashes, change. Clients that pin
+  hashes must update them.
+
+## Previous — FastMCP server
 
 - Replaces the hand-wired SDK server with a FastMCP 4.1.6 server. The ten tool names, closed
   schemas, scopes and schema hashes are unchanged; a black-box behavior suite pins them.

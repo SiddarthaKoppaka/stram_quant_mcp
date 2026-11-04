@@ -35,6 +35,36 @@ dispatch. Invalid inputs and unknown entities are not retried. Overload, deadlin
 errors are retryable only after the caller applies its own bounded policy. MCP errors contain a safe
 message and `isError=true`; they do not expose paths, SQL, dependency details or stack traces.
 
+## Clean view
+
+`quant_list_series`, `quant_get_series`, `quant_get_derived`, `quant_get_aligned_panel` and
+`quant_get_conditional_returns` accept an optional `view`: `raw` (the default) or `clean`. Other tools
+reject it. Both views come from the same Data Interface call and carry the same envelope and
+warnings; the raw result is exactly as described below.
+
+The clean result is marked `"view": "clean"` and holds no value the raw result lacks:
+
+| Tool | Clean shape |
+|---|---|
+| `quant_list_series` | One table (`columns`, `rows`), counts `by_dataset` and `by_provider`, and `limit_reached` when the result filled the limit |
+| `quant_get_series` | `series`, each with its dataset, kind, provider, unit and indicator once, and rows of `observed_on`, `value`, `known_since`, `flags` |
+| `quant_get_derived` | `groups` per indicator, subject, version, unit and formula, with rows of `observation_date`, `value`, `known_since`, `event_id`, `flags`; `event_id` resolves through `quant_get_lineage` |
+| `quant_get_aligned_panel` | A value table (`observed_on` plus one column per series), `column_details` with missing, filled and stale counts and the `known_since` range, and `filled_or_stale` cells listed separately |
+| `quant_get_conditional_returns` | `horizons` with each outcome beside its baseline, and `events` as rows of `event_date`, `entry_date`, `entry_close` and one return per horizon |
+
+Formatting rules: dates are ISO strings; exact decimals drop trailing zeros (`0.460000000000` becomes
+`0.46`) without changing the value; frequency spellings such as `D`, `day` and `daily` become
+`daily`. `flags` lists quality flags, `vintage`, `retracted`, `licensed_input` and the availability
+kind where a row has one. When no rows match, or most days of a study are undetermined, `explanation`
+says why in plain words, for example that a value counts only from its `known_since` date.
+
+Per-row identifiers other than derived `event_id`, input event and batch IDs, per-cell availability
+details and per-condition values stay in the raw view. Use it when you need them.
+
+```json
+{"series_keys":["SPY"],"kinds":["market_bar"],"start_date":"2026-10-01","end_date":"2026-10-31","view":"clean"}
+```
+
 ## Discovery tools
 
 ### `quant_list_series`
