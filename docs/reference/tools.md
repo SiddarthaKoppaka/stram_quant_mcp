@@ -42,24 +42,24 @@ message and `isError=true`; they do not expose paths, SQL, dependency details or
 reject it. Both views come from the same Data Interface call and carry the same envelope and
 warnings; the raw result is exactly as described below.
 
-The clean result is marked `"view": "clean"` and holds no value the raw result lacks:
+The clean view is **lossless**: every raw row can be rebuilt from it exactly. Fields that every row of
+a group shares are stated once in the group; every other field stays on its row, including IDs,
+timestamps, lineage IDs and availability evidence. Rows are tuples named by `columns`. The result is
+marked `"view": "clean"` and carries the raw `availability` summary unchanged.
 
 | Tool | Clean shape |
 |---|---|
-| `quant_list_series` | One table (`columns`, `rows`), counts `by_dataset` and `by_provider`, and `limit_reached` when the result filled the limit |
-| `quant_get_series` | `series`, each with its dataset, kind, provider, unit and indicator once, and rows of `observed_on`, `value`, `known_since`, `flags` |
-| `quant_get_derived` | `groups` per indicator, subject, version, unit and formula, with rows of `observation_date`, `value`, `known_since`, `event_id`, `flags`; `event_id` resolves through `quant_get_lineage` |
-| `quant_get_aligned_panel` | A value table (`observed_on` plus one column per series), `column_details` with missing, filled and stale counts and the `known_since` range, and `filled_or_stale` cells listed separately |
-| `quant_get_conditional_returns` | `horizons` with each outcome beside its baseline, and `events` as rows of `event_date`, `entry_date`, `entry_close` and one return per horizon |
+| `quant_list_series` | One table of every catalog field plus `frequency_normalized`, counts `by_dataset` and `by_provider` of the returned entries, and `limit_reached` |
+| `quant_get_series` | `series` grouped by dataset, kind, provider, series key, indicator and unit; each row keeps `observed_on`, `observed_at`, `value`, `known_since`, `is_vintage`, `ingested_at`, `event_id`, `record_id`, `quality_flags` and `availability` |
+| `quant_get_derived` | `groups` by indicator, version, subject, unit and formula; each row keeps `observation_date`, `value`, `known_since`, `computed_at`, `event_id`, `input_event_ids`, `input_batch_ids`, `availability_basis`, `licensed_input`, `retracted` and `availability` |
+| `quant_get_aligned_panel` | A value table (`observed_on` plus one column per series) and `cells`, which lists every present cell with its value, observation date, `known_since`, `filled`, `stale_days` and `availability`. A cell absent from `cells` was absent in the raw panel; a listed cell with a null value was present with no value |
+| `quant_get_conditional_returns` | `horizons` with each outcome's six statistics beside the baseline's, and `events` as rows of `event_columns`, whose `conditions` are rows of `condition_columns` |
 
-Formatting rules: dates are ISO strings; exact decimals drop trailing zeros (`0.460000000000` becomes
-`0.46`) without changing the value; frequency spellings such as `D`, `day` and `daily` become
-`daily`. `flags` lists quality flags, `vintage`, `retracted`, `licensed_input` and the availability
-kind where a row has one. When no rows match, or most days of a study are undetermined, `explanation`
-says why in plain words, for example that a value counts only from its `known_since` date.
-
-Per-row identifiers other than derived `event_id`, input event and batch IDs, per-cell availability
-details and per-condition values stay in the raw view. Use it when you need them.
+Only two things change form. Exact decimals drop trailing zeros as text, never by rounding
+(`0.460000000000` becomes `0.46`). Frequency spellings such as `D`, `day` and `daily` are also given
+as one word in `frequency_normalized`, beside the original `frequency`. When no rows match, or a
+study has no evaluated days, no events, or mostly undetermined days, `explanation` says why in plain
+words.
 
 ```json
 {"series_keys":["SPY"],"kinds":["market_bar"],"start_date":"2026-10-01","end_date":"2026-10-31","view":"clean"}

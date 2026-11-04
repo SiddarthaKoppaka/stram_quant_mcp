@@ -4,11 +4,11 @@
 
 - Adds an optional `view` input, `raw` (the default) or `clean`, to `quant_list_series`,
   `quant_get_series`, `quant_get_derived`, `quant_get_aligned_panel` and
-  `quant_get_conditional_returns`. The raw result is unchanged. The clean result holds the same
-  values in a shape sized for agents: shared fields once per series, rows as short tuples, exact
-  decimals without trailing zeros, one spelling per frequency, catalog counts by dataset and provider,
-  and a plain explanation when a result is empty or mostly undetermined. No value is computed;
-  golden tests compare every clean value with its raw value.
+  `quant_get_conditional_returns`. The raw result is unchanged. The clean result is lossless: fields
+  a group of rows shares are stated once, every other field stays on its row, and rows become tuples
+  named by `columns`. Exact decimals drop trailing zeros as text, frequencies gain a normalized
+  spelling beside the original, and empty or undetermined results gain a plain explanation. Golden
+  tests rebuild every raw row from the clean view.
 - The five tools' input and output schemas, and so their schema hashes, change. Clients that pin
   hashes must update them.
 

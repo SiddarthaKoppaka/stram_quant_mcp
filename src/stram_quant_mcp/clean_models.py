@@ -1,31 +1,22 @@
-"""Closed models for the clean view: the raw facts, in a shape sized for an agent.
+"""Closed models for the clean view: every raw value, in a shape sized for an agent.
 
-A clean result holds no value the raw result lacks. Fields shared by every row of a series appear
-once; rows become short tuples named by ``columns``. Dates are ISO strings and exact decimals are
-strings without trailing zeros.
+The clean view is lossless. Fields that every row of a group shares are stated once in the group;
+everything else, including identifiers, timestamps, lineage and availability evidence, stays on
+each row. Rows are short tuples named by ``columns``. Dates and timestamps are ISO strings and exact
+decimals are strings without trailing zeros.
 """
 
 from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import JsonValue
+from stram_data.data_interface import AvailabilitySummary
 
-from stram_quant_mcp.contract_base import AvailabilityMode, ContractModel
+from stram_quant_mcp.contract_base import ContractModel
 
-Cell = str | float | int | bool | None
-Row = tuple[Cell, ...]
+Row = tuple[JsonValue, ...]
 CleanMarker = Literal["clean"]
-
-
-class CleanAvailability(ContractModel):
-    """The availability summary, without the policy texts the discovery tools already give."""
-
-    mode: AvailabilityMode
-    hindsight_only: bool
-    unavailable_rows: int
-    uncovered: tuple[str, ...]
-    warnings: tuple[str, ...]
 
 
 class CleanCatalogData(ContractModel):
@@ -39,10 +30,11 @@ class CleanCatalogData(ContractModel):
     limit_reached: bool
     by_dataset: dict[str, int]
     by_provider: dict[str, int]
+    explanation: str | None = None
 
 
 class CleanSeries(ContractModel):
-    """One series, with its shared fields once and a row per observation."""
+    """One series, with the fields its rows share stated once."""
 
     series_key: str
     dataset: str
@@ -65,25 +57,24 @@ class CleanSeriesData(ContractModel):
     as_of: str | None
     all_versions: bool
     availability_note: str
-    availability: CleanAvailability
+    availability: AvailabilitySummary
     explanation: str | None = None
 
 
 class CleanDerivedGroup(ContractModel):
-    """One derived indicator for one subject, with its definition once."""
+    """One derived indicator definition for one subject, with its rows."""
 
     indicator_id: str
     indicator_version: str
     subject: str | None
     unit: str
     formula: str | None
-    availability_basis: str | None
     columns: tuple[str, ...]
     rows: tuple[Row, ...]
 
 
 class CleanDerivedData(ContractModel):
-    """Derived rows grouped by indicator and subject; ``event_id`` resolves through lineage."""
+    """Derived rows grouped by indicator, subject, version, unit and formula."""
 
     view: CleanMarker
     groups: tuple[CleanDerivedGroup, ...]
@@ -92,29 +83,33 @@ class CleanDerivedData(ContractModel):
     truncated: bool
     as_of: str | None
     availability_note: str
-    availability: CleanAvailability
+    availability: AvailabilitySummary
     explanation: str | None = None
 
 
 class CleanPanelColumn(ContractModel):
-    """What the cells of one panel column hold, without repeating it in every cell."""
+    """Counts over one panel column's cells, read from the cells themselves."""
 
     name: str
-    missing_cells: int
+    absent_cells: int
+    null_values: int
     filled_cells: int
     stale_cells: int
-    known_since_first: str | None
-    known_since_last: str | None
 
 
 class CleanPanelData(ContractModel):
-    """The aligned panel as a table: one row per date, one value per column."""
+    """The aligned panel as a value table, plus every present cell's details.
+
+    A cell missing from ``cells`` was absent in the raw panel; a listed cell with a null value was
+    present with no value. The two are never merged.
+    """
 
     view: CleanMarker
     columns: tuple[str, ...]
     rows: tuple[Row, ...]
+    cell_columns: tuple[str, ...]
+    cells: tuple[Row, ...]
     column_details: tuple[CleanPanelColumn, ...]
-    filled_or_stale: tuple[Row, ...] = Field(default=())
     count: int
     limit: int
     truncated: bool
@@ -122,7 +117,7 @@ class CleanPanelData(ContractModel):
     calendar: str
     fill: str
     availability_note: str
-    availability: CleanAvailability
+    availability: AvailabilitySummary
     explanation: str | None = None
 
 
@@ -140,6 +135,8 @@ class CleanHorizon(ContractModel):
     baseline_mean: float | None
     baseline_median: float | None
     baseline_hit_rate: float | None
+    baseline_minimum: float | None
+    baseline_maximum: float | None
 
 
 class CleanConditionalReturnsData(ContractModel):
@@ -156,9 +153,10 @@ class CleanConditionalReturnsData(ContractModel):
     event_count: int
     horizons: tuple[CleanHorizon, ...]
     event_columns: tuple[str, ...]
+    condition_columns: tuple[str, ...]
     events: tuple[Row, ...]
     truncated: bool
     notes: tuple[str, ...]
     availability_note: str
-    availability: CleanAvailability
+    availability: AvailabilitySummary
     explanation: str | None = None
