@@ -16,7 +16,7 @@ from stram_quant_mcp.clean_models import (
     CleanPanelData,
     CleanSeriesData,
 )
-from stram_quant_mcp.clean_views import NO_EVENTS, NO_ROWS
+from stram_quant_mcp.clean_views import LIMIT_FILLED, NO_EVENTS, NO_ROWS
 from stram_quant_mcp.errors import ToolInputError
 from stram_quant_mcp.tool_adapter import QuantToolAdapter
 
@@ -119,6 +119,24 @@ def test_clean_catalog_rebuilds_every_raw_entry(tool_adapter: QuantToolAdapter) 
     assert rebuilt == raw
     assert clean.by_dataset == dict(Counter(entry["dataset"] for entry in raw))
     assert clean.by_provider == dict(Counter(entry["provider"] for entry in raw))
+
+
+def test_a_catalog_that_fills_the_limit_says_more_may_exist(
+    tool_adapter: QuantToolAdapter,
+) -> None:
+    clean = CleanCatalogData.model_validate(_clean(tool_adapter, "quant_list_series", {"limit": 1}))
+
+    assert (clean.count, clean.limit_filled) == (1, True)
+    assert clean.explanation == LIMIT_FILLED
+
+
+def test_a_catalog_below_the_limit_is_not_called_filled(tool_adapter: QuantToolAdapter) -> None:
+    clean = CleanCatalogData.model_validate(
+        _clean(tool_adapter, "quant_list_series", {"limit": 500})
+    )
+
+    assert clean.count < clean.limit
+    assert (clean.limit_filled, clean.explanation) == (False, None)
 
 
 def test_clean_series_rebuilds_every_raw_row(tool_adapter: QuantToolAdapter) -> None:

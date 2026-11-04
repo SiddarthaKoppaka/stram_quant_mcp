@@ -133,6 +133,10 @@ NO_ROWS = (
     "mode; try availability='estimated', a later window or different filters."
 )
 NO_CATALOG_ENTRIES = "No series matched; the dataset filter may exclude every entry."
+LIMIT_FILLED = (
+    "The result filled the requested limit, so more entries may exist; filter by dataset or raise "
+    "the limit to see them."
+)
 NO_EVALUATED_DAYS = (
     "No trading days in the window could be evaluated, so there is nothing to measure."
 )
@@ -189,11 +193,17 @@ def clean_catalog(data: CatalogData, limit: int) -> CleanCatalogData:
         rows=tuple(_catalog_row(entry) for entry in entries),
         count=len(entries),
         limit=limit,
-        limit_reached=len(entries) >= limit,
+        limit_filled=len(entries) >= limit,
         by_dataset=dict(Counter(entry.dataset for entry in entries)),
         by_provider=dict(Counter(entry.provider for entry in entries)),
-        explanation=None if entries else NO_CATALOG_ENTRIES,
+        explanation=_catalog_explanation(len(entries), limit),
     )
+
+
+def _catalog_explanation(count: int, limit: int) -> str | None:
+    if count == 0:
+        return NO_CATALOG_ENTRIES
+    return LIMIT_FILLED if count >= limit else None
 
 
 def _catalog_row(entry: CatalogEntry) -> Row:

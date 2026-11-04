@@ -27,7 +27,9 @@ class CleanCatalogData(ContractModel):
     rows: tuple[Row, ...]
     count: int
     limit: int
-    limit_reached: bool
+    # True when the result filled the limit. The catalog has no total, so more entries may or may
+    # not exist; this never claims a cutoff happened.
+    limit_filled: bool
     by_dataset: dict[str, int]
     by_provider: dict[str, int]
     explanation: str | None = None

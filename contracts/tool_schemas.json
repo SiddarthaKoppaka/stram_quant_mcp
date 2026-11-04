@@ -195,8 +195,8 @@
                 "title": "Limit",
                 "type": "integer"
               },
-              "limit_reached": {
-                "title": "Limit Reached",
+              "limit_filled": {
+                "title": "Limit Filled",
                 "type": "boolean"
               },
               "rows": {
@@ -221,7 +221,7 @@
               "rows",
               "count",
               "limit",
-              "limit_reached",
+              "limit_filled",
               "by_dataset",
               "by_provider"
             ],
@@ -283,7 +283,7 @@
         "title": "ToolEnvelope[Union[CatalogData, CleanCatalogData]]",
         "type": "object"
       },
-      "schemaHash": "49c8721ed93c0ea680636759e3dfa4440ec377995b61ddc05ee1e2f6a3df7904",
+      "schemaHash": "16a063f7ab65d0da18b7362b835920c14d545a293234ad7dc6cdd9b8a66f827d",
       "scope": "quant:discover"
     },
     {

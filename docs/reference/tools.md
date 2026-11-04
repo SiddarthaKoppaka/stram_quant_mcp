@@ -49,7 +49,7 @@ marked `"view": "clean"` and carries the raw `availability` summary unchanged.
 
 | Tool | Clean shape |
 |---|---|
-| `quant_list_series` | One table of every catalog field plus `frequency_normalized`, counts `by_dataset` and `by_provider` of the returned entries, and `limit_reached` |
+| `quant_list_series` | One table of every catalog field plus `frequency_normalized`, counts `by_dataset` and `by_provider` of the returned entries, and `limit_filled` when the result filled the limit, which means more entries may exist |
 | `quant_get_series` | `series` grouped by dataset, kind, provider, series key, indicator and unit; each row keeps `observed_on`, `observed_at`, `value`, `known_since`, `is_vintage`, `ingested_at`, `event_id`, `record_id`, `quality_flags` and `availability` |
 | `quant_get_derived` | `groups` by indicator, version, subject, unit and formula; each row keeps `observation_date`, `value`, `known_since`, `computed_at`, `event_id`, `input_event_ids`, `input_batch_ids`, `availability_basis`, `licensed_input`, `retracted` and `availability` |
 | `quant_get_aligned_panel` | A value table (`observed_on` plus one column per series) and `cells`, which lists every present cell with its value, observation date, `known_since`, `filled`, `stale_days` and `availability`. A cell absent from `cells` was absent in the raw panel; a listed cell with a null value was present with no value |
