@@ -94,7 +94,10 @@ def test_siddu_installer_is_valid_and_keeps_activation_gates() -> None:
     assert "AddHost=$MCP_ALLOWED_HOSTS:$PRIVATE_HOST_IPV4" in text
     assert "HealthCmd=/usr/bin/pg_isready" in text
     assert '--internal "$AUTH_NETWORK"' in text
-    assert "Volume=$LAKE:/lake:ro,nosuid,nodev,noexec" in text
+    assert "Volume=$LAKE:/lake" not in text  # the MCP no longer mounts the lake
+    assert "Secret=$DATA_SECRET,type=mount,target=$DATA_SECRET_TARGET" in text
+    assert "worker-network-probe" not in text
+    assert "data-plane-probe" in text
     assert "Ulimit=stack=2097152:2097152" in text
     assert "PodmanArgs=--cpus=2" in text
     assert "Environment=MALLOC_ARENA_MAX=2" in text
@@ -172,12 +175,15 @@ def test_siddu_installer_rejects_drift_and_placeholder_configs() -> None:
         assert f"{action})" in text
 
 
-def test_siddu_installer_includes_egress_seccomp_audit_backup_and_rollback_steps() -> None:
+def test_siddu_installer_includes_egress_data_plane_audit_backup_and_rollback_steps() -> None:
     text = INSTALLER.read_text()
     assert '("example.com", 443, "DNS")' in text
     assert '("1.1.1.1", 443, "IPv4")' in text
     assert '("2606:4700:4700::1111", 443, "IPv6")' in text
-    assert "PASS: worker process has an additional seccomp filter" in text
+    assert "verify_data_plane_link" in text
+    assert "tcp dport $DATA_SERVICE_PORT" in text
+    assert "stram_quant_drill" in text
+    assert "_SECRET_FILE" in text  # the validator accepts a secret file path, never a secret value
     assert "-m stram_quant_mcp.audit backup --db /audit/audit.sqlite3" in text
     assert '"$QUANT_QUADLET.pre-rollback"' in text
     assert "as_quant systemctl --user restart stram-quant-mcp.service" in text

@@ -1,5 +1,11 @@
 # STRAM HQ Handoff: Stram Quant MCP — SIDDU M6 Private Staging
 
+> **Historical record (2026-11-01).** It describes the former design: `stram-data` 1.3.1 in-process,
+> a spawned seccomp worker and a read-only lake mount. The service now calls the Data Plane over HTTP
+> and has no lake mount. For the current design and procedure see
+> [the HTTP gateway runbook](how-to/deploy-the-http-gateway.md) and
+> [Architecture](explanation/architecture.md).
+
 **Prepared:** 2026-11-01  
 **Host:** `SIDDU` (EndeavourOS Linux, kernel 7.2.11-arch1-1, Rootless Podman 6.1.4, Netavark/pasta, cgroup v2)  
 **Repository / Branch:** `/home/siddu/Apps/stram/stram_quant_mcp` (`feat/m6-siddu-local-keycloak`, reviewed runtime source `ea520857962051a8085dd2b353ecb3aeaa1e98da`)
