@@ -7,7 +7,7 @@
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "List bounded quantitative series metadata from the read-only catalog.",
+      "description": "List the quantitative series available in the read-only catalog.\n\nUse when: you need to discover which series keys, providers, units and coverage exist before querying data.\nDo not use for: reading observations (use quant_get_series).\nInputs: optional dataset (economic_observation, market_bar, positioning_report); limit 1-500, default 100; view raw|clean.\nReturns: catalog entries with dataset, provider, series key, unit, frequency, counts and coverage; limit_filled in the clean view means more entries may exist.\nRead-only and idempotent; safe to call again.\n\nFailures return isError=true and _meta['io.stram/error'] with code, category, retryable, reason and next_action:\n- invalid_request: an argument is wrong; the reason names the field. Fix it. Not retryable.\n- access_denied: the token lacks this tool's scope. Not retryable; ask the administrator.\n- unavailable: the Data Plane is down or paused. Retryable with backoff; honour retry_after_seconds.\n- overloaded: capacity or rate limit reached. Retryable after retry_after_seconds.\n- deadline_exceeded: too slow. Retry once with a narrower range or fewer series.\n- data_plane_error, service_credentials_rejected, data_plane_forbidden: a server-side fault. Not retryable; report the request_id.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -283,7 +283,7 @@
         "title": "ToolEnvelope[Union[CatalogData, CleanCatalogData]]",
         "type": "object"
       },
-      "schemaHash": "16a063f7ab65d0da18b7362b835920c14d545a293234ad7dc6cdd9b8a66f827d",
+      "schemaHash": "f6b726019b8d2e1fa8d3447d6e1a9860a7b6bda3d50e1c332f5e97da1b9524e6",
       "scope": "quant:discover"
     },
     {
@@ -293,7 +293,7 @@
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "List derived quantitative indicators and their coverage.",
+      "description": "List the derived indicators and their coverage.\n\nUse when: you need a valid indicator_id for quant_get_derived or quant_list_indicator_subjects.\nDo not use for: reading indicator values (use quant_get_derived).\nInputs: none.\nReturns: indicators with id, description, formula, version and coverage.\nRead-only and idempotent; safe to call again.\n\nFailures return isError=true and _meta['io.stram/error'] with code, category, retryable, reason and next_action:\n- invalid_request: an argument is wrong; the reason names the field. Fix it. Not retryable.\n- access_denied: the token lacks this tool's scope. Not retryable; ask the administrator.\n- unavailable: the Data Plane is down or paused. Retryable with backoff; honour retry_after_seconds.\n- overloaded: capacity or rate limit reached. Retryable after retry_after_seconds.\n- deadline_exceeded: too slow. Retry once with a narrower range or fewer series.\n- data_plane_error, service_credentials_rejected, data_plane_forbidden: a server-side fault. Not retryable; report the request_id.",
       "inputSchema": {
         "additionalProperties": false,
         "description": "Closed empty input for parameterless tools.",
@@ -425,7 +425,7 @@
         "title": "ToolEnvelope[IndicatorsData]",
         "type": "object"
       },
-      "schemaHash": "2483b5bee1cdb7f73748257a7b3f78e3426b763db06d415a1cdd8108008c4174",
+      "schemaHash": "f67ef34bf3e96916823197d509268a2217582770c9b136e5800222d3d47d0f2f",
       "scope": "quant:discover"
     },
     {
@@ -435,7 +435,7 @@
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "List subjects available for one derived indicator.",
+      "description": "List the subjects (for example symbols) available for one derived indicator.\n\nUse when: choosing the subject filter for quant_get_derived after quant_list_indicators.\nDo not use for: indicators without subjects; they return an empty list.\nInputs: indicator_id (1-100 characters).\nReturns: a list of subject keys.\nRead-only and idempotent; safe to call again.\n\nFailures return isError=true and _meta['io.stram/error'] with code, category, retryable, reason and next_action:\n- invalid_request: an argument is wrong; the reason names the field. Fix it. Not retryable.\n- access_denied: the token lacks this tool's scope. Not retryable; ask the administrator.\n- unavailable: the Data Plane is down or paused. Retryable with backoff; honour retry_after_seconds.\n- overloaded: capacity or rate limit reached. Retryable after retry_after_seconds.\n- deadline_exceeded: too slow. Retry once with a narrower range or fewer series.\n- data_plane_error, service_credentials_rejected, data_plane_forbidden: a server-side fault. Not retryable; report the request_id.\n- not_found: no such entity. Check the id with a discovery tool. Not retryable.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -519,7 +519,7 @@
         "title": "ToolEnvelope[IndicatorSubjectsData]",
         "type": "object"
       },
-      "schemaHash": "2ef0007e4e420658ceb97acfd0038ab3232d147ca02faa7657ebf3acb3660b03",
+      "schemaHash": "4838955e7c1626b1958c28e92f60ff6f9b70dd36d03c529137bd0965772396e5",
       "scope": "quant:discover"
     },
     {
@@ -529,7 +529,7 @@
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "Describe the versioned historical-availability policies in force.",
+      "description": "Describe the versioned historical-availability policies in force.\n\nUse when: you must understand what strict, estimated and ex_post mean for each dataset before interpreting results.\nDo not use for: reading data.\nInputs: none.\nReturns: each policy's dataset, version, evidence rules and known limitations.\nRead-only and idempotent; safe to call again.\n\nFailures return isError=true and _meta['io.stram/error'] with code, category, retryable, reason and next_action:\n- invalid_request: an argument is wrong; the reason names the field. Fix it. Not retryable.\n- access_denied: the token lacks this tool's scope. Not retryable; ask the administrator.\n- unavailable: the Data Plane is down or paused. Retryable with backoff; honour retry_after_seconds.\n- overloaded: capacity or rate limit reached. Retryable after retry_after_seconds.\n- deadline_exceeded: too slow. Retry once with a narrower range or fewer series.\n- data_plane_error, service_credentials_rejected, data_plane_forbidden: a server-side fault. Not retryable; report the request_id.",
       "inputSchema": {
         "additionalProperties": false,
         "description": "Closed empty input for parameterless tools.",
@@ -712,7 +712,7 @@
         "title": "ToolEnvelope[AvailabilityPoliciesData]",
         "type": "object"
       },
-      "schemaHash": "8941fb48c186404b5a92520b0d8a2023afbcba58adfc68ca1f75d770b57ff1fc",
+      "schemaHash": "8824c6e43bdf9818371beeaccbab324148d9e1bcb7ccb65b6f36076645319225",
       "scope": "quant:discover"
     },
     {
@@ -722,7 +722,7 @@
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "Report quantitative dataset freshness and known limitations.",
+      "description": "Report how fresh each quantitative dataset is, with known limitations.\n\nUse when: you must check that data is current enough before relying on it.\nDo not use for: history; it reports recency only.\nInputs: none.\nReturns: per-dataset latest observation, ingestion time and caveats.\nRead-only and idempotent; safe to call again.\n\nFailures return isError=true and _meta['io.stram/error'] with code, category, retryable, reason and next_action:\n- invalid_request: an argument is wrong; the reason names the field. Fix it. Not retryable.\n- access_denied: the token lacks this tool's scope. Not retryable; ask the administrator.\n- unavailable: the Data Plane is down or paused. Retryable with backoff; honour retry_after_seconds.\n- overloaded: capacity or rate limit reached. Retryable after retry_after_seconds.\n- deadline_exceeded: too slow. Retry once with a narrower range or fewer series.\n- data_plane_error, service_credentials_rejected, data_plane_forbidden: a server-side fault. Not retryable; report the request_id.",
       "inputSchema": {
         "additionalProperties": false,
         "description": "Closed empty input for parameterless tools.",
@@ -861,7 +861,7 @@
         "title": "ToolEnvelope[FreshnessReport]",
         "type": "object"
       },
-      "schemaHash": "e3892b213feb6e0d7a86c3d705f0e690d473c394707b80a668540513f478e761",
+      "schemaHash": "d67ce89134cfe6b4b2fba70f759b77725fff6801f946ab4d09fdf7a078e387b7",
       "scope": "quant:discover"
     },
     {
@@ -871,7 +871,7 @@
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "Read bounded quantitative series with revisions and availability semantics preserved.",
+      "description": "Read bounded quantitative series with revisions and availability semantics preserved.\n\nUse when: you need observations for known series_keys, indicator_ids or a provider over a date range.\nDo not use for: listing what exists (use quant_list_series) or computed indicators (use quant_get_derived).\nInputs: start_date and end_date (inclusive, at most 1830 days apart); at least one of series_keys, indicator_ids, provider; kinds; as_of; all_versions; limit 1-500 (default 100); availability strict (default) | estimated | ex_post (hindsight-only, cannot be combined with as_of); view raw|clean.\nReturns: rows with value, unit, quality flags, known_since, revision and lineage ids; truncated=true means narrow the range or filters.\nRead-only and idempotent; safe to call again.\n\nFailures return isError=true and _meta['io.stram/error'] with code, category, retryable, reason and next_action:\n- invalid_request: an argument is wrong; the reason names the field. Fix it. Not retryable.\n- access_denied: the token lacks this tool's scope. Not retryable; ask the administrator.\n- unavailable: the Data Plane is down or paused. Retryable with backoff; honour retry_after_seconds.\n- overloaded: capacity or rate limit reached. Retryable after retry_after_seconds.\n- deadline_exceeded: too slow. Retry once with a narrower range or fewer series.\n- data_plane_error, service_credentials_rejected, data_plane_forbidden: a server-side fault. Not retryable; report the request_id.\n- resource_limit: the result is too large. Reduce limit, window or series. Not retryable unchanged.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1635,7 +1635,7 @@
         "title": "ToolEnvelope[Union[SeriesResult, CleanSeriesData]]",
         "type": "object"
       },
-      "schemaHash": "2e09f6edde4d359a3e78f8995ee9895c88fbb96255b63dc339e56d385328bcd7",
+      "schemaHash": "7a3ab74e1119462a10f436ec0ee2bf99377ba32f53c69e30f7884efcb155da68",
       "scope": "quant:read"
     },
     {
@@ -1645,7 +1645,7 @@
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "Read one bounded derived indicator with exact values and lineage identifiers.",
+      "description": "Read one bounded derived indicator with exact decimal values and lineage identifiers.\n\nUse when: you need computed indicators such as yield spreads over a date range.\nDo not use for: raw source observations (use quant_get_series).\nInputs: indicator_id; optional subject; start_date and end_date (at most 1830 days); as_of; limit 1-500; availability strict | estimated | ex_post; view raw|clean.\nReturns: rows with exact decimal strings, input event ids, availability basis and retraction state.\nRead-only and idempotent; safe to call again.\n\nFailures return isError=true and _meta['io.stram/error'] with code, category, retryable, reason and next_action:\n- invalid_request: an argument is wrong; the reason names the field. Fix it. Not retryable.\n- access_denied: the token lacks this tool's scope. Not retryable; ask the administrator.\n- unavailable: the Data Plane is down or paused. Retryable with backoff; honour retry_after_seconds.\n- overloaded: capacity or rate limit reached. Retryable after retry_after_seconds.\n- deadline_exceeded: too slow. Retry once with a narrower range or fewer series.\n- data_plane_error, service_credentials_rejected, data_plane_forbidden: a server-side fault. Not retryable; report the request_id.\n- resource_limit: the result is too large. Reduce limit, window or series. Not retryable unchanged.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -2378,7 +2378,7 @@
         "title": "ToolEnvelope[Union[DerivedResult, CleanDerivedData]]",
         "type": "object"
       },
-      "schemaHash": "0a697924262ac3d8c354a1b05c1e822129a3e1d500b244e1ab723c0d477de11c",
+      "schemaHash": "e7f72a782be101ea4b5dc19bb38084fa6004c52a6d2b1c3786e879ca9c21b67d",
       "scope": "quant:read"
     },
     {
@@ -2388,7 +2388,7 @@
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "Resolve source observations behind one derived event identifier.",
+      "description": "Resolve the source observations behind one derived event identifier.\n\nUse when: you must audit where a derived value came from, using an event_id from quant_get_derived.\nDo not use for: searching; it needs an exact event id.\nInputs: event_id (UUID).\nReturns: the derived event with its input observations and batches.\nRead-only and idempotent; safe to call again.\n\nFailures return isError=true and _meta['io.stram/error'] with code, category, retryable, reason and next_action:\n- invalid_request: an argument is wrong; the reason names the field. Fix it. Not retryable.\n- access_denied: the token lacks this tool's scope. Not retryable; ask the administrator.\n- unavailable: the Data Plane is down or paused. Retryable with backoff; honour retry_after_seconds.\n- overloaded: capacity or rate limit reached. Retryable after retry_after_seconds.\n- deadline_exceeded: too slow. Retry once with a narrower range or fewer series.\n- data_plane_error, service_credentials_rejected, data_plane_forbidden: a server-side fault. Not retryable; report the request_id.\n- not_found: no such entity. Check the id with a discovery tool. Not retryable.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -2783,7 +2783,7 @@
         "title": "ToolEnvelope[LineageResult]",
         "type": "object"
       },
-      "schemaHash": "881d7c1cf7dd9f0eb31cc96501fcaffcae5b7d3760515ba5f2376aca5c68e3ed",
+      "schemaHash": "218071bb18a5646402f726828bc71de743bc3849975f4c8fe87d6a24af40c6c4",
       "scope": "quant:lineage"
     },
     {
@@ -2793,7 +2793,7 @@
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "Align bounded quantitative series on an explicit calendar with bounded gap handling.",
+      "description": "Align up to 8 series on an explicit calendar with bounded gap handling.\n\nUse when: you need to compare series side by side on one calendar (union, intersection or first_column), optionally with forward fill.\nDo not use for: single-series reads (use quant_get_series).\nInputs: columns (1-8: name, series_key, optional indicator_id); start_date and end_date (at most 1830 days); calendar; fill none|forward; max_staleness_days 0-366; limit 1-500; availability; view raw|clean.\nReturns: a date-by-column table where every cell keeps its observation date, known_since, filled flag and stale_days.\nRead-only and idempotent; safe to call again.\n\nFailures return isError=true and _meta['io.stram/error'] with code, category, retryable, reason and next_action:\n- invalid_request: an argument is wrong; the reason names the field. Fix it. Not retryable.\n- access_denied: the token lacks this tool's scope. Not retryable; ask the administrator.\n- unavailable: the Data Plane is down or paused. Retryable with backoff; honour retry_after_seconds.\n- overloaded: capacity or rate limit reached. Retryable after retry_after_seconds.\n- deadline_exceeded: too slow. Retry once with a narrower range or fewer series.\n- data_plane_error, service_credentials_rejected, data_plane_forbidden: a server-side fault. Not retryable; report the request_id.\n- resource_limit: the result is too large. Reduce limit, window or series. Not retryable unchanged.",
       "inputSchema": {
         "$defs": {
           "PanelColumnInput": {
@@ -3563,7 +3563,7 @@
         "title": "ToolEnvelope[Union[PanelResult, CleanPanelData]]",
         "type": "object"
       },
-      "schemaHash": "174994544288483023fff778179476a75c16ebd0691310c0719815aeba1cfefe",
+      "schemaHash": "038a04823774c101c0837ac218a43ebdb597a287f697ee8a394b5acf48684b3f",
       "scope": "quant:analytics"
     },
     {
@@ -3573,7 +3573,7 @@
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "Compute bounded forward returns after conditions became known, with a baseline.",
+      "description": "Compute bounded forward returns after conditions became known, with a baseline.\n\nUse when: you need to study how a target symbol behaved after signal conditions on other series became known.\nDo not use for: forecasting; this is a historical study, not a prediction.\nInputs: target_symbol; conditions (operator gt|ge|lt|le|rising|falling with threshold); horizons; start_date and end_date (at most 1830 days); availability; view raw|clean.\nReturns: per-horizon outcome statistics beside a baseline, plus the contributing events with their lineage.\nRead-only and idempotent; safe to call again.\n\nFailures return isError=true and _meta['io.stram/error'] with code, category, retryable, reason and next_action:\n- invalid_request: an argument is wrong; the reason names the field. Fix it. Not retryable.\n- access_denied: the token lacks this tool's scope. Not retryable; ask the administrator.\n- unavailable: the Data Plane is down or paused. Retryable with backoff; honour retry_after_seconds.\n- overloaded: capacity or rate limit reached. Retryable after retry_after_seconds.\n- deadline_exceeded: too slow. Retry once with a narrower range or fewer series.\n- data_plane_error, service_credentials_rejected, data_plane_forbidden: a server-side fault. Not retryable; report the request_id.\n- resource_limit: the result is too large. Reduce limit, window or series. Not retryable unchanged.",
       "inputSchema": {
         "$defs": {
           "ConditionInput": {
@@ -4724,7 +4724,7 @@
         "title": "ToolEnvelope[Union[ConditionalReturnsResult, CleanConditionalReturnsData]]",
         "type": "object"
       },
-      "schemaHash": "e39ba9899683a7bf0d7c7ea538e3996cda52119d3914063e87a0df4ab75323bc",
+      "schemaHash": "9571870dfbf234fa40641f6cdef7f21b35966796367ec1dfe7d41a63d5e5c019",
       "scope": "quant:analytics"
     }
   ]

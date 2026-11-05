@@ -1,8 +1,7 @@
 {
-  "baseline_sha256": "9978fb792d16cb89e1ae2e93061fe2c8362f34ef8f6ddefc2b52155e8d103745",
   "interface_version": "1",
-  "package_commit": "890b44911b56d0f165cfa7962032d00292b4e10e",
-  "package_version": "1.3.1",
+  "package_commit": "3059c1e1932a05dfbe8db4dd25b00b3a286d6fca",
+  "package_version": "1.9.0",
   "public_methods": [
     "describe_availability_policies",
     "get_aligned_panel",
@@ -10,7 +9,14 @@
     "get_conditional_returns",
     "get_derived",
     "get_freshness",
+    "get_latest_quote",
+    "get_latest_trade",
     "get_lineage",
+    "get_news",
+    "get_news_coverage",
+    "get_news_text",
+    "get_news_timeline",
+    "get_quote_status",
     "get_series",
     "list_indicator_subjects",
     "list_indicators"
@@ -18,6 +24,7 @@
   "required_public_names": [
     "AvailabilityConfig",
     "AvailabilitySummary",
+    "CatalogEntry",
     "Condition",
     "ConditionalReturnsQuery",
     "ConditionalReturnsResult",
@@ -27,6 +34,7 @@
     "DerivedResult",
     "FreshnessReport",
     "INTERFACE_VERSION",
+    "IndicatorInfo",
     "InvalidQueryError",
     "LineageResult",
     "NotFoundError",
