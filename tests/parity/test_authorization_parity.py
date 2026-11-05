@@ -19,7 +19,7 @@ def test_a_token_missing_the_tools_scope_is_denied(parity: ParityClient, spec: A
     result = parity.call_tool(spec.name, {}, token).result
 
     assert result["isError"] is True
-    assert result["content"][0]["text"] == ToolForbiddenError.public_message
+    assert result["content"][0]["text"].startswith(ToolForbiddenError.public_message)
     assert "structuredContent" not in result
 
 

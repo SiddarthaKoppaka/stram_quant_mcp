@@ -49,6 +49,10 @@ OUTCOME_BY_CODE = {
     "invalid_request": "invalid_request",
     "not_found": "invalid_request",
     "unavailable": "unavailable",
+    "service_credentials_rejected": "unavailable",
+    "data_plane_forbidden": "unavailable",
+    "data_plane_error": "unavailable",
+    "resource_limit": "invalid_request",
 }
 DENIAL_AUDIT = {
     DenialReason.UNKNOWN_TOOL: (DENIED, "invalid_tool", ToolInputError.__name__),
@@ -58,11 +62,14 @@ DEFAULT_DENIAL_AUDIT = (DENIED, "authorization_denied", ToolForbiddenError.__nam
 
 
 def error_result(error: QuantToolError) -> ToolResult:
-    """Build the one safe error reply: a fixed message, plus whether retrying can help."""
+    """Build the one safe error reply: what failed, why, whether retrying helps, and what next.
+
+    The text is for people and models; the same facts are in ``meta`` as fields to branch on.
+    """
     return ToolResult(
-        content=[TextContent(type="text", text=error.public_message)],
+        content=[TextContent(type="text", text=error.caller_text)],
         is_error=True,
-        meta={ERROR_META_KEY: {"code": error.code, "retryable": error.retryable}},
+        meta={ERROR_META_KEY: error.public_details()},
     )
 
 
@@ -178,7 +185,17 @@ class AccessControlMiddleware(Middleware):
             self._throttle.record_denial(principal)
         audit = DENIAL_AUDIT.get(reason, DEFAULT_DENIAL_AUDIT)
         self._auditor.record(name, identity, current_request(), audit)
-        raise ToolInputError if reason is DenialReason.UNKNOWN_TOOL else ToolForbiddenError
+        if reason is DenialReason.UNKNOWN_TOOL:
+            raise ToolInputError(f"{name[:60]!r} is not a tool of this service.")
+        if reason is DenialReason.THROTTLED:
+            raise ToolForbiddenError(
+                "This caller made too many denied calls recently and is blocked from all tools.",
+                next_action=(
+                    "Stop calling tools the token is not scoped for; the block lifts after the "
+                    "denial window passes without further denied calls."
+                ),
+            )
+        raise ToolForbiddenError
 
     def _identity(self) -> CallerIdentity | None:
         return identity_from_token(get_access_token(), self._tenant_claim)

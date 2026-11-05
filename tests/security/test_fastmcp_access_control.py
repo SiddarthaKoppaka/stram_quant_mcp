@@ -9,6 +9,7 @@ import pytest
 from starlette.testclient import TestClient
 
 from stram_quant_mcp.access_policy import ScopeGrantStore
+from stram_quant_mcp.errors import ToolForbiddenError
 from stram_quant_mcp.fastmcp_auth import StrictVerifier
 from stram_quant_mcp.fastmcp_server import create_fastmcp_application
 from stram_quant_mcp.settings import AppSettings
@@ -21,6 +22,7 @@ from tests.parity.harness import (
     TokenMinter,
     parity_settings,
 )
+from tests.support.fake_data_plane import FakeDataPlane
 
 DENIAL_LIMIT = 3
 ACCESS_DENIED = "Access denied."
@@ -33,7 +35,11 @@ def _open(
     settings = settings or parity_settings(tmp_path)
     verifier = StrictVerifier(settings, public_key=minter.public_key_pem())
     built = create_fastmcp_application(
-        settings, token_verifier=verifier, audit_key=b"k" * 32, **overrides
+        settings,
+        token_verifier=verifier,
+        audit_key=b"k" * 32,
+        data_transport=FakeDataPlane(),
+        **overrides,
     )
     with TestClient(built.app, base_url=f"https://{HOST}") as client:
         yield ParityClient(client, minter, settings.audit_db_path), minter
@@ -62,8 +68,9 @@ def test_a_caller_the_store_has_no_grant_for_is_denied_everything(
 
     assert listed == []
     assert called["isError"] is True
-    assert called["content"][0]["text"] == ACCESS_DENIED
-    assert called["_meta"]["io.stram/error"] == {"code": "access_denied", "retryable": False}
+    assert called["content"][0]["text"].startswith(ACCESS_DENIED)
+    assert called["_meta"]["io.stram/error"] == ToolForbiddenError().public_details()
+    assert called["_meta"]["io.stram/error"]["category"] == "access_denied"
 
 
 def test_a_denied_call_never_reaches_the_worker(
@@ -89,7 +96,7 @@ def test_repeated_denials_block_the_caller_from_every_tool(
     blocked = client.call_tool("quant_list_series", {"limit": 1}, narrow).result
 
     assert allowed_before["isError"] is False
-    assert blocked["content"][0]["text"] == ACCESS_DENIED
+    assert blocked["content"][0]["text"].startswith(ACCESS_DENIED)
     assert client.audit_outcomes()[-1] == "denial_throttled"
 
 

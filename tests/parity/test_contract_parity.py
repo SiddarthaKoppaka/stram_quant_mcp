@@ -87,7 +87,9 @@ def test_invalid_arguments_return_one_safe_error(
     text = result["content"][0]["text"]
 
     assert result["isError"] is True
-    assert text == ToolInputError.public_message
+    assert text.startswith(ToolInputError.public_message)
+    assert "Why:" in text
+    assert "Not retryable." in text
     assert not any(marker in text.lower() for marker in LEAK_MARKERS)
 
 
@@ -97,4 +99,4 @@ def test_an_unknown_tool_returns_the_same_safe_error(parity: ParityClient) -> No
     result = parity.call_tool("quant_delete_everything", {}, token).result
 
     assert result["isError"] is True
-    assert result["content"][0]["text"] == ToolInputError.public_message
+    assert result["content"][0]["text"].startswith(ToolInputError.public_message)

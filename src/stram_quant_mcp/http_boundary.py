@@ -74,7 +74,7 @@ class TransportDenialAuditMiddleware:
                 schema_hash=spec.schema_hash() if spec else None,
                 authorization_outcome="denied",
                 required_scope=spec.scope if spec else None,
-                policy_version=self._runtime.worker.policy_version,
+                policy_version=self._runtime.backend.policy_version,
                 duration_ms=round((time.monotonic() - started) * 1000, 3),
                 outcome=outcome,
                 error_class=f"HTTP{status}",

@@ -4,7 +4,7 @@ Exceptions block release unless every field below remains current. They are not 
 
 ## PYSEC-2026-113 / CVE-2026-25087
 
-- **Dependency:** `pyarrow==22.0.0`, transitively constrained to `<23` by frozen `stram-data==1.3.1`
+- **Dependency:** `pyarrow==22.0.0`, transitively constrained to `<23` by pinned `stram-data==1.9.0`
 - **Severity:** high (CVSS 7.0)
 - **Owner:** Stram Quant MCP security/release owner
 - **Review date:** 2026-10-31
@@ -15,9 +15,8 @@ Exceptions block release unless every field below remains current. They are not 
 - **Applicability:** not reachable in this service. The MCP accepts no files, paths, IPC payloads, or
   arbitrary queries. The pinned public Data Interface reads a host-curated, read-only Parquet lake;
   this repository contains no Arrow IPC reader or pre-buffering call.
-- **Mitigations:** no arbitrary file/upload/URL tools; closed schemas; worker process isolation and hard
-  memory/deadline limits; read-only curated lake; process-local socket denial; container bounds and
-  host egress allowlists.
+- **Mitigations:** no arbitrary file/upload/URL tools; closed schemas; no lake mount or query path in this service (it only calls the Data Plane over HTTP); bounded
+  concurrency and deadlines; container bounds and host egress allowlists.
 - **Resolution:** test and adopt the first approved frozen Data Plane release whose declared PyArrow
   range includes 23.0.1+, then remove the `pip-audit --ignore-vuln PYSEC-2026-113` gate argument.
 

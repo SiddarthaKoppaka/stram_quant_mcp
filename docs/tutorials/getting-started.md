@@ -23,7 +23,7 @@ You should see `uv` resolve and install packages without errors.
 uv run python -c 'import stram_data; print(stram_data.__version__)'
 ```
 
-You should see `1.3.1`. The server refuses to start against any other version.
+You should see `1.9.0`. At startup the server also checks the Data Plane service it connects to and refuses to start against an incompatible version.
 
 ## 3. Run the end-to-end test
 
@@ -44,7 +44,7 @@ Open [the test](../../tests/integration/test_fastmcp_client.py) and find the cal
 you listed is described in the [tool reference](../reference/tools.md), with the scope it needs.
 
 You now have a working local server, and you have seen the full path a request takes: token check,
-scope check, isolated worker, data interface.
+scope check, bounded Data Plane backend, Data Plane service.
 
 ## Where to go next
 

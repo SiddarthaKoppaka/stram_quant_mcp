@@ -8,16 +8,12 @@ import os
 import sys
 from pathlib import Path
 
-import stram_data
-from stram_data.data_interface import INTERFACE_VERSION, DataInterface
+from stram_data.data_interface import INTERFACE_VERSION
 
 from stram_quant_mcp.app import main as serve
-from stram_quant_mcp.worker import (
-    EXPECTED_INTERFACE_VERSION,
-    EXPECTED_STRAM_DATA_VERSION,
-    QueryWorker,
-    verify_native_network_isolation,
-)
+from stram_quant_mcp.data_client import DataPlaneClient, DataPlaneSettings
+from stram_quant_mcp.http_backend import HttpDataBackend
+from stram_quant_mcp.settings import AppSettings
 
 
 def mount_is_read_only(target: Path, mountinfo: str) -> bool:
@@ -46,32 +42,22 @@ def preflight(
     mountinfo_path: Path = Path("/proc/self/mountinfo"),
     effective_uid: int | None = None,
 ) -> int:
-    """Verify the immutable runtime, read-only mounts, and public Data Interface."""
+    """Verify the immutable runtime and configuration without contacting any service."""
 
-    lake = Path(os.environ.get("STRAM_MCP_PARQUET_ROOT", "/lake"))
     uid = os.geteuid() if effective_uid is None else effective_uid
     if uid == 0:
         raise RuntimeError("container must not run as root")
-    if not lake.is_dir() or not mountinfo_path.is_file():
-        raise RuntimeError("lake or Linux mount metadata is unavailable")
-    mountinfo = mountinfo_path.read_text()
-    if not mount_is_read_only(Path("/"), mountinfo):
+    if not mountinfo_path.is_file():
+        raise RuntimeError("Linux mount metadata is unavailable")
+    if not mount_is_read_only(Path("/"), mountinfo_path.read_text()):
         raise RuntimeError("container root filesystem is not read-only")
-    if not mount_is_read_only(lake, mountinfo):
-        raise RuntimeError("quantitative lake mount is not read-only")
-    if stram_data.__version__ != EXPECTED_STRAM_DATA_VERSION:
-        raise RuntimeError("stram-data release mismatch")
-    if INTERFACE_VERSION != EXPECTED_INTERFACE_VERSION:
-        raise RuntimeError("Data Interface version mismatch")
-    data = DataInterface(lake)
-    policies = data.describe_availability_policies()
-    if not policies:
-        raise RuntimeError("availability policies are unavailable")
+    settings = AppSettings.from_env()
+    if not settings.data_client_secret_path.is_file():
+        raise RuntimeError("Data Plane client secret file is unavailable")
     result = {
         "status": "preflight_ok",
         "interface_version": INTERFACE_VERSION,
-        "stram_data_version": stram_data.__version__,
-        "lake_read_only": True,
+        "data_plane": "http",
         "root_read_only": True,
         "uid": uid,
     }
@@ -79,24 +65,30 @@ def preflight(
     return 0
 
 
-async def worker_interface_probe() -> None:
-    """Start the production worker boundary and call the real public Data Interface."""
+async def data_plane_probe() -> None:
+    """Start the production backend and read the real Data Plane's availability policies."""
 
-    lake = Path(os.environ.get("STRAM_MCP_PARQUET_ROOT", "/lake"))
-    worker = QueryWorker(lake)
-    try:
-        await worker.start()
-        result = await worker.call(
-            "quant_describe_availability",
-            {},
-            "container-worker-probe",
-            10.0,
+    settings = AppSettings.from_env()
+    client = DataPlaneClient(
+        DataPlaneSettings(
+            base_url=settings.data_url,
+            token_url=settings.data_token_url,
+            client_id=settings.data_client_id,
+            client_secret_path=settings.data_client_secret_path,
+            connect_timeout_seconds=settings.data_connect_timeout_seconds,
+            max_response_bytes=settings.max_response_bytes,
+            allow_insecure_http=settings.allow_insecure_http,
         )
-        if not worker.dependency_versions_match or not isinstance(result.get("data"), dict):
-            raise RuntimeError("worker Data Interface probe failed")
+    )
+    backend = HttpDataBackend(client)
+    try:
+        await backend.start()
+        result = await backend.call("quant_describe_availability", {}, "container-probe", 10.0)
+        if not backend.dependency_versions_match or not isinstance(result.get("data"), dict):
+            raise RuntimeError("Data Plane probe failed")
     finally:
-        await worker.close()
-    sys.stdout.write('{"status":"worker_interface_ok"}\n')
+        await backend.close()
+    sys.stdout.write('{"status":"data_plane_ok"}\n')
 
 
 def main() -> None:
@@ -107,17 +99,10 @@ def main() -> None:
         return
     if command == "preflight" and len(sys.argv) == 2:
         raise SystemExit(preflight())
-    if command == "worker-network-probe" and len(sys.argv) == 2:
-        verify_native_network_isolation()
-        sys.stdout.write('{"status":"worker_network_isolated"}\n')
+    if command == "data-plane-probe" and len(sys.argv) == 2:
+        asyncio.run(data_plane_probe())
         return
-    if command == "worker-interface-probe" and len(sys.argv) == 2:
-        asyncio.run(worker_interface_probe())
-        return
-    raise SystemExit(
-        "usage: stram_quant_mcp.entrypoint "
-        "[serve|preflight|worker-network-probe|worker-interface-probe]"
-    )
+    raise SystemExit("usage: stram_quant_mcp.entrypoint [serve|preflight|data-plane-probe]")
 
 
 def _unescape_mount(value: str) -> str:

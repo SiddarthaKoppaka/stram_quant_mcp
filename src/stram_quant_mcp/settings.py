@@ -14,7 +14,10 @@ class AppSettings(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True, url_preserve_empty_path=True)
 
-    parquet_root: Path
+    data_url: AnyHttpUrl
+    data_token_url: AnyHttpUrl
+    data_client_id: str = Field(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9_.:\-]+$")
+    data_client_secret_path: Path
     audit_db_path: Path
     audit_key_path: Path
     issuer_url: AnyHttpUrl
@@ -26,13 +29,13 @@ class AppSettings(BaseModel):
     allowed_hosts: tuple[str, ...] = Field(min_length=1, max_length=16)
     allowed_origins: tuple[str, ...] = Field(default=(), max_length=16)
     queue_wait_seconds: float = Field(default=2.0, gt=0, le=30)
-    max_queued: int = Field(default=2, ge=0, le=32)
+    data_max_concurrent: int = Field(default=4, ge=1, le=32)
+    data_connect_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
+    data_breaker_threshold: int = Field(default=5, ge=1, le=100)
+    data_breaker_cooldown_seconds: float = Field(default=15.0, gt=0, le=300)
     max_request_body_bytes: int = Field(default=1024 * 1024, ge=1024, le=4 * 1024 * 1024)
     max_response_bytes: int = Field(default=4 * 1024 * 1024, ge=1024, le=8 * 1024 * 1024)
-    worker_memory_mb: int = Field(default=1024, ge=128, le=8192)
-    worker_max_restarts: int = Field(default=3, ge=0, le=20)
-    worker_restart_backoff_seconds: float = Field(default=0.25, ge=0, le=10)
-    worker_shutdown_seconds: float = Field(default=5.0, gt=0, le=30)
+    backend_shutdown_seconds: float = Field(default=5.0, gt=0, le=30)
     rate_limit_per_minute: int = Field(default=30, ge=1, le=1000)
     denial_limit: int = Field(default=5, ge=1, le=100)
     denial_window_seconds: float = Field(default=60.0, gt=0, le=3600)
@@ -55,7 +58,13 @@ class AppSettings(BaseModel):
             for algorithm in self.allowed_algorithms
         ):
             raise ValueError("only reviewed asymmetric JWT algorithms are allowed")
-        urls = (self.issuer_url, self.resource_url, self.jwks_url)
+        urls = (
+            self.issuer_url,
+            self.resource_url,
+            self.jwks_url,
+            self.data_url,
+            self.data_token_url,
+        )
         if not self.allow_insecure_http and any(url.scheme != "https" for url in urls):
             raise ValueError("issuer, resource and JWKS URLs must use HTTPS")
         if self.allow_insecure_http:
@@ -76,7 +85,11 @@ class AppSettings(BaseModel):
         """Parse the complete environment once; missing values fail startup."""
 
         required = {
-            "parquet_root": "STRAM_MCP_PARQUET_ROOT",
+            "data_url": "STRAM_MCP_DATA_URL",
+            "data_token_url": "STRAM_MCP_DATA_TOKEN_URL",
+            "data_client_id": "STRAM_MCP_DATA_CLIENT_ID",
+            # pragma: allowlist nextline secret
+            "data_client_secret_path": "STRAM_MCP_DATA_CLIENT_SECRET_FILE",
             "audit_db_path": "STRAM_MCP_AUDIT_DB",
             "audit_key_path": "STRAM_MCP_AUDIT_KEY_FILE",
             "issuer_url": "STRAM_MCP_ISSUER_URL",
@@ -96,9 +109,11 @@ class AppSettings(BaseModel):
         values["image_digest"] = os.environ.get("STRAM_MCP_IMAGE_DIGEST", "development")
         values["otlp_endpoint"] = os.environ.get("STRAM_MCP_OTLP_ENDPOINT") or None
         optional_numbers = {
-            "worker_max_restarts": "STRAM_MCP_WORKER_MAX_RESTARTS",
-            "worker_restart_backoff_seconds": "STRAM_MCP_WORKER_RESTART_BACKOFF_SECONDS",
-            "worker_shutdown_seconds": "STRAM_MCP_WORKER_SHUTDOWN_SECONDS",
+            "data_max_concurrent": "STRAM_MCP_DATA_MAX_CONCURRENT",
+            "data_connect_timeout_seconds": "STRAM_MCP_DATA_CONNECT_TIMEOUT_SECONDS",
+            "data_breaker_threshold": "STRAM_MCP_DATA_BREAKER_THRESHOLD",
+            "data_breaker_cooldown_seconds": "STRAM_MCP_DATA_BREAKER_COOLDOWN_SECONDS",
+            "backend_shutdown_seconds": "STRAM_MCP_BACKEND_SHUTDOWN_SECONDS",
             "denial_limit": "STRAM_MCP_DENIAL_LIMIT",
             "denial_window_seconds": "STRAM_MCP_DENIAL_WINDOW_SECONDS",
         }

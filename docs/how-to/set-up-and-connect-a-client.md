@@ -13,8 +13,8 @@ staging or production access and must not be run without separate authorization.
 - For a long-running authenticated server, an OAuth/OIDC issuer that provides asymmetric JWTs and a
   reachable JWKS endpoint. Local automated integration generates an ephemeral test identity instead.
 
-The exact runtime dependency is `stram-data` 1.3.1 at Git commit
-`890b44911b56d0f165cfa7962032d00292b4e10e`; `uv.lock` is authoritative.
+The exact runtime dependency is `stram-data` 1.9.0 at Git commit
+`3059c1e1932a05dfbe8db4dd25b00b3a286d6fca`, used for typed models only; `uv.lock` is authoritative.
 
 ## Local development
 
@@ -22,7 +22,7 @@ From the repository root:
 
 ```bash
 uv sync --frozen --dev
-uv run python -c 'import stram_data; assert stram_data.__version__ == "1.3.1"'
+uv run python -c 'import stram_data; assert stram_data.__version__ == "1.9.0"'
 uv run python -m stram_quant_mcp.tools.export_schema --check
 ```
 
@@ -51,8 +51,8 @@ uv run pytest tests/integration/test_mcp_client.py -q
 It performs the entire workflow: chooses a loopback port, generates an ephemeral RSA key, signs a
 five-minute JWT with all four tool scopes, starts authenticated Streamable HTTP, initializes the
 official MCP client, lists ten tools, calls `quant_list_series`, verifies a genuine synthetic-lake
-record and shuts down. The Data Interface and worker are real; only identity material is local and
-ephemeral.
+record and shuts down. The Data Plane HTTP service is the real `stram_data` application run in-process over
+the synthetic lake; only identity material and the network are local and ephemeral.
 
 To keep a development server running, first create a local audit key and configure a local issuer.
 The issuer, audience and JWKS values must match the JWT exactly:
@@ -61,7 +61,10 @@ The issuer, audience and JWKS values must match the JWT exactly:
 mkdir -p .local/audit
 umask 077
 openssl rand -out .local/audit.key 32
-export STRAM_MCP_PARQUET_ROOT="$PWD/tests/fixtures/lake"
+export STRAM_MCP_DATA_URL="https://siddu.tailc5da4c.ts.net:8444"   # staging Data Plane, tailnet only
+export STRAM_MCP_DATA_TOKEN_URL="https://siddu.tailc5da4c.ts.net/realms/stram-staging/protocol/openid-connect/token"
+export STRAM_MCP_DATA_CLIENT_ID="stram-quant-mcp-staging"
+export STRAM_MCP_DATA_CLIENT_SECRET_FILE="$PWD/.local/data-client.secret"  # obtained through the agreed secret channel
 export STRAM_MCP_AUDIT_DB="$PWD/.local/audit/audit.sqlite3"
 export STRAM_MCP_AUDIT_KEY_FILE="$PWD/.local/audit.key"
 export STRAM_MCP_ISSUER_URL="http://127.0.0.1:9000/"
@@ -150,9 +153,9 @@ capturing tokens, raw tool payloads, paths or unrestricted result data.
 | HTTP 401 | signature, issuer, audience, expiry, client/subject, tenant and JWKS reachability | Correct the test identity; never bypass verification |
 | Tool returns forbidden | tool scope in [Tool reference](../reference/tools.md) | Request the narrow required scope |
 | HTTP 403 or 421 | configured Origin and Host | Fix proxy/client headers or allowlist through review |
-| Readiness 503 after worker failures | restart count and safe telemetry outcome | Stop admission, preserve evidence, restart only after cause is understood |
-| Deadline/overload tool error | query bounds, one-worker queue and configured deadlines | Narrow the query or retry later; do not auto-retry blindly |
+| Readiness 503 | audit health, then the startup log for a `service_credentials` or Data Plane version failure | Fix the cause named in the error; restart only after it is understood |
+| Deadline/overload/unavailable tool error | the error `category`, `retryable` and `retry_after_seconds` | Narrow the query or retry after the stated wait; do not auto-retry blindly |
 | Audit unavailable | audit volume, key match, chain verification and free space | Keep service out of rotation; preserve journal and key; follow incident runbook |
-| Preflight rejects mount | UID, root mount and lake mount options | Correct container/host mounts; never use an allow-writable override |
+| Preflight rejects the runtime | UID, root mount options and the client secret file | Correct the container; never use an allow-writable override |
 
 For recovery, key rotation and rollback, use [Operations](operate-the-service.md).

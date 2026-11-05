@@ -16,7 +16,7 @@ Successful calls return structured content with this envelope:
 ```json
 {
   "tool_version": "0.1.0",
-  "stram_data_version": "1.3.1",
+  "stram_data_version": "1.9.0",
   "interface_version": "1",
   "policy_version": "availability-policy-hash",
   "request_id": "server-generated-id",
@@ -249,30 +249,47 @@ is undetermined, not false. The default next-close entry prevents same-close loo
 
 ### Error replies
 
-Every failed call returns `isError=true` and one fixed message from a closed set; no exception text,
-validation detail, path or stack trace is ever included. The FastMCP server also tells the client
-whether retrying can help, in the result's `_meta`:
+Every failed call returns `isError=true`. The reply says what failed, why, whether retrying can help
+and what to do next, both as text for people and models and as fields in `_meta` for code to branch on.
+No exception text, path, SQL, upstream body, token or stack trace is ever included.
 
 ```json
 {
   "isError": true,
-  "content": [{"type": "text", "text": "Access denied."}],
-  "_meta": {"io.stram/error": {"code": "access_denied", "retryable": false}}
+  "content": [{"type": "text", "text": "Quantitative data is temporarily unavailable. Why: The Data Plane reported its data is temporarily unavailable (HTTP 503). Retryable. Wait at least 7s first. Next: Retry with exponential backoff; if it persists, contact the operator."}],
+  "_meta": {"io.stram/error": {
+    "code": "unavailable",
+    "category": "data_plane_unavailable",
+    "retryable": true,
+    "reason": "The Data Plane reported its data is temporarily unavailable (HTTP 503).",
+    "next_action": "Retry with exponential backoff; if it persists, contact the operator.",
+    "retry_after_seconds": 7
+  }}
 }
 ```
 
-| `code` | Message | `retryable` |
-|---|---|---|
-| `access_denied` | `Access denied.` | no |
-| `invalid_request` | The tool arguments are invalid or outside the allowed bounds. | no |
-| `not_found` | The requested quantitative data entity was not found. | no |
-| `resource_limit` | The quantitative result exceeds the allowed resource budget. | no |
-| `unavailable` | Quantitative data is temporarily unavailable. | yes, after a client-side backoff |
-| `deadline_exceeded` | The quantitative query exceeded its deadline. | yes, after a client-side backoff |
-| `overloaded` | The quantitative service is at capacity. | yes, after a client-side backoff |
+`retry_after_seconds` appears only when a wait is known. `upstream_request_id` appears when the Data
+Plane supplied an opaque correlation id; quote it, with the MCP `request_id`, when reporting a problem.
 
-The service never retries a data query itself. A caller that is denied is not told why, so it cannot
-learn which scope, tenant or issuer check failed.
+| `code` | `category` | `retryable` | Cause and what the caller should do |
+|---|---|---|---|
+| `invalid_request` | `caller_error` | no | An argument is wrong or outside a bound, or the Data Plane rejected the query (for example a span over 1,830 days). The reason names the field and rule, never the submitted value. Fix the argument. |
+| `not_found` | `caller_error` | no | The indicator or event does not exist. Check the id with a discovery tool. |
+| `access_denied` | `access_denied` | no | The caller's token does not grant the tool, or the caller was blocked after repeated denials. The reply does not name the missing scope or tenant, so a refused caller learns nothing about the policy. Ask the identity administrator. |
+| `service_credentials_rejected` | `service_credentials` | no | The Data Plane rejected this service's own credentials. Not the caller's token. An operator must check the client secret, audience and scopes. |
+| `data_plane_forbidden` | `service_credentials` | no | The Data Plane refused this service for a route; the reason names the missing scope. An operator must grant it. |
+| `unavailable` | `data_plane_unavailable` | yes | The Data Plane or identity provider is down, starting, rate limiting, or paused by the circuit breaker. Retry with backoff, waiting `retry_after_seconds`. |
+| `overloaded` | `capacity` | yes | All query slots stayed busy, or the caller exceeded its rate limit. Retry after `retry_after_seconds`. |
+| `deadline_exceeded` | `deadline` | yes, once | The Data Plane did not answer within the tool's time limit. Retry once with a narrower range, fewer series or a smaller limit. |
+| `data_plane_error` | `data_plane_error` | no | The Data Plane returned an internal error, or a reply that no longer matches the reviewed contract. Report both request ids. |
+| `resource_limit` | `resource_limit` | no | The response exceeds the size cap. Reduce the limit, window or number of series. |
+| `internal_error` | `internal` | no | An unexpected fault in this service. Report the `request_id`. |
+
+Availability outcomes such as `no_data`, `stale`, `not_entitled` and `provider_unavailable` are normal
+results, not errors, and pass through unchanged.
+
+The service never retries a data query itself, apart from one token refresh, one connection reset
+retry and honouring `Retry-After`. Retry policy beyond that belongs to the caller.
 
 ### Tool visibility
 

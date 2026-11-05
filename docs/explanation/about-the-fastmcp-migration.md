@@ -37,7 +37,7 @@ maintain and review.
 These are the parts that exist because of this service's security and data promises, not because of the
 framework. They stay as they are and are called from the new tool functions:
 
-- the isolated query worker with its seccomp filter, deadlines and response budgets;
+- the bounded Data Plane backend (formerly an isolated query worker) with its deadlines and response budgets;
 - the HMAC-chained audit journal, including one terminal record per call;
 - the exact issuer, audience, tenant and expiry checks;
 - Host and Origin allowlists and the redaction rules for logs and telemetry;

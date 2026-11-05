@@ -17,10 +17,10 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: SiddarthaKoppaka/stram_data
-          ref: 890b44911b56d0f165cfa7962032d00292b4e10e # pragma: allowlist secret; public commit
+          ref: 3059c1e1932a05dfbe8db4dd25b00b3a286d6fca # pragma: allowlist secret; public commit
           token: ${{ secrets.STRAM_DATA_READ_TOKEN }}
           path: stram_data
-          # prepare_container_dependency.sh verifies the v1.3.1 tag resolves to the pinned commit.
+          # prepare_container_dependency.sh verifies the pinned commit declares version 1.9.0.
           fetch-depth: 0
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
@@ -65,8 +65,7 @@ jobs:
         run: |
           test "$(docker image inspect stram-quant-mcp:test --format '{{.Config.User}}')" = "10001:10001"
           test "$(docker image inspect stram-quant-mcp:test --format '{{index .Config.Labels "org.opencontainers.image.base.digest"}}')" = "sha256:593bd06efe90efa80dc4eee3948be7c0fde4134606dd40d8dd8dbcade98e669c"
-          docker run --rm --read-only --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m --cap-drop ALL --security-opt no-new-privileges stram-quant-mcp:test worker-network-probe
-          docker run --rm --read-only --network none --cap-drop ALL --security-opt no-new-privileges --mount type=bind,src="$GITHUB_WORKSPACE/tests/fixtures/lake",dst=/lake,readonly --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m stram-quant-mcp:test worker-interface-probe
-          docker run --rm --read-only --network none --cap-drop ALL --security-opt no-new-privileges --mount type=bind,src="$GITHUB_WORKSPACE/tests/fixtures/lake",dst=/lake,readonly --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m stram-quant-mcp:test preflight
+          printf "ci-placeholder" > build/data-client.secret
+          docker run --rm --read-only --network none --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m --mount type=bind,src="$GITHUB_WORKSPACE/build/data-client.secret",dst=/run/secrets/data-client-secret,readonly -e STRAM_MCP_DATA_URL=https://data.invalid -e STRAM_MCP_DATA_TOKEN_URL=https://idp.invalid/token -e STRAM_MCP_DATA_CLIENT_ID=ci -e STRAM_MCP_DATA_CLIENT_SECRET_FILE=/run/secrets/data-client-secret -e STRAM_MCP_AUDIT_DB=/tmp/audit.db -e STRAM_MCP_AUDIT_KEY_FILE=/tmp/audit.key -e STRAM_MCP_ISSUER_URL=https://idp.invalid/ -e STRAM_MCP_RESOURCE_URL=https://mcp.invalid/mcp -e STRAM_MCP_JWKS_URL=https://idp.invalid/jwks -e STRAM_MCP_TENANT_ID=ci -e STRAM_MCP_ALLOWED_HOSTS=mcp.invalid stram-quant-mcp:test preflight
       - name: Image vulnerability gate
         run: docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.68.1@sha256:a93fd67162843c0f749002af9245fe9a2e5edc41445bd71d3949c803e95ef05b image --scanners vuln --ignore-unfixed --severity HIGH,CRITICAL --format json stram-quant-mcp:test | uv run python tools/check_trivy_scan.py

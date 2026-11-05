@@ -18,6 +18,7 @@ from pydantic import ConfigDict, ValidationError
 from stram_quant_mcp.access_policy import identity_from_token
 from stram_quant_mcp.errors import ToolInputError
 from stram_quant_mcp.fastmcp_audit import PreDispatchAuditor
+from stram_quant_mcp.input_validation import describe_validation_error
 from stram_quant_mcp.policy import InvocationService
 from stram_quant_mcp.request_context import current_request
 from stram_quant_mcp.tool_registry import TOOL_SPECS, ToolSpec
@@ -62,11 +63,11 @@ class QuantTool(Tool):
     def _reject_invalid_arguments(self, arguments: dict[str, Any], token: Any) -> None:
         try:
             self.spec.input_model.model_validate(arguments)
-        except ValidationError:
+        except ValidationError as error:
             identity = identity_from_token(token, self.tenant_claim)
             outcome = ("allowed", "error", ToolInputError.__name__)
             self.auditor.record(self.spec.name, identity, current_request(), outcome)
-            raise ToolInputError from None
+            raise ToolInputError(describe_validation_error(error)) from None
 
 
 def build_tool(

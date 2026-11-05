@@ -6,11 +6,10 @@ import pytest
 
 from stram_quant_mcp import entrypoint
 from stram_quant_mcp.entrypoint import mount_is_read_only
-from tests.conftest import SYNTHETIC_LAKE
+from tests.support.fake_data_plane import FakeDataPlane
 
 MOUNTINFO = """\
 35 24 0:31 / / ro,relatime - overlay overlay ro
-40 35 8:1 /quant /lake ro,nosuid,nodev,noexec,relatime - ext4 /dev/sda1 ro
 41 35 8:1 /audit /audit rw,nosuid,nodev,noexec,relatime - ext4 /dev/sda1 rw
 42 35 8:1 /space /path\\040with\\040space ro,relatime - ext4 /dev/sda1 ro
 """
@@ -18,94 +17,86 @@ MOUNTINFO = """\
 
 def test_preflight_mount_parser_uses_longest_explicit_mount() -> None:
     assert mount_is_read_only(Path("/"), MOUNTINFO)
-    assert mount_is_read_only(Path("/lake/dataset"), MOUNTINFO)
     assert not mount_is_read_only(Path("/audit"), MOUNTINFO)
     assert mount_is_read_only(Path("/path with space"), MOUNTINFO)
     assert not mount_is_read_only(Path("/missing"), "")
 
 
-def _mountinfo(tmp_path: Path, *, root: str = "ro", lake: str = "ro") -> Path:
+def _mountinfo(tmp_path: Path, *, root: str = "ro") -> Path:
     path = tmp_path / "mountinfo"
-    path.write_text(
-        f"35 24 0:31 / / {root},relatime - overlay overlay {root}\n"
-        f"40 35 8:1 /quant {SYNTHETIC_LAKE.resolve()} {lake},relatime - ext4 /dev/sda1 {lake}\n"
-    )
+    path.write_text(f"35 24 0:31 / / {root},relatime - overlay overlay {root}\n")
     return path
 
 
-def test_preflight_checks_real_public_interface(monkeypatch, tmp_path, capsys) -> None:
-    monkeypatch.setenv("STRAM_MCP_PARQUET_ROOT", str(SYNTHETIC_LAKE))
-    result = entrypoint.preflight(
-        mountinfo_path=_mountinfo(tmp_path),
-        effective_uid=10001,
-    )
+def _configure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, secret: bool = True) -> None:
+    secret_path = tmp_path / "data.secret"
+    if secret:
+        secret_path.write_text("test-client-secret")
+    values = {
+        "STRAM_MCP_DATA_URL": "http://testserver",
+        "STRAM_MCP_DATA_TOKEN_URL": "http://testserver/token",
+        "STRAM_MCP_DATA_CLIENT_ID": "stram-quant-mcp",
+        "STRAM_MCP_DATA_CLIENT_SECRET_FILE": str(secret_path),
+        "STRAM_MCP_AUDIT_DB": str(tmp_path / "audit.db"),
+        "STRAM_MCP_AUDIT_KEY_FILE": str(tmp_path / "audit.key"),
+        "STRAM_MCP_ISSUER_URL": "http://testserver/issuer",
+        "STRAM_MCP_RESOURCE_URL": "http://testserver/mcp",
+        "STRAM_MCP_JWKS_URL": "http://testserver/jwks",
+        "STRAM_MCP_TENANT_ID": "stram",
+        "STRAM_MCP_ALLOWED_HOSTS": "testserver",
+        "STRAM_MCP_ALLOW_INSECURE_HTTP": "1",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+
+
+def test_preflight_passes_without_contacting_any_service(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _configure(monkeypatch, tmp_path)
+
+    result = entrypoint.preflight(mountinfo_path=_mountinfo(tmp_path), effective_uid=10001)
+
     assert result == 0
     assert '"status": "preflight_ok"' in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(
-    ("uid", "root_mode", "lake_mode", "message"),
-    [
-        (0, "ro", "ro", "root"),
-        (10001, "rw", "ro", "root filesystem"),
-        (10001, "ro", "rw", "lake mount"),
-    ],
+    ("uid", "root_mode", "message"),
+    [(0, "ro", "root"), (10001, "rw", "root filesystem")],
 )
 def test_preflight_fails_closed_on_privilege_or_mounts(
-    monkeypatch, tmp_path, uid: int, root_mode: str, lake_mode: str, message: str
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, uid: int, root_mode: str, message: str
 ) -> None:
-    monkeypatch.setenv("STRAM_MCP_PARQUET_ROOT", str(SYNTHETIC_LAKE))
+    _configure(monkeypatch, tmp_path)
     with pytest.raises(RuntimeError, match=message):
-        entrypoint.preflight(
-            mountinfo_path=_mountinfo(tmp_path, root=root_mode, lake=lake_mode),
-            effective_uid=uid,
-        )
+        entrypoint.preflight(mountinfo_path=_mountinfo(tmp_path, root=root_mode), effective_uid=uid)
 
 
-def test_preflight_rejects_missing_lake_and_version_drift(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("STRAM_MCP_PARQUET_ROOT", str(tmp_path / "missing"))
-    with pytest.raises(RuntimeError, match="unavailable"):
-        entrypoint.preflight(mountinfo_path=_mountinfo(tmp_path), effective_uid=10001)
-
-    monkeypatch.setenv("STRAM_MCP_PARQUET_ROOT", str(SYNTHETIC_LAKE))
-    monkeypatch.setattr(entrypoint.stram_data, "__version__", "wrong")
-    with pytest.raises(RuntimeError, match="release mismatch"):
+def test_preflight_rejects_a_missing_client_secret(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _configure(monkeypatch, tmp_path, secret=False)
+    with pytest.raises(RuntimeError, match="secret file"):
         entrypoint.preflight(mountinfo_path=_mountinfo(tmp_path), effective_uid=10001)
 
 
 @pytest.mark.asyncio
-async def test_worker_interface_probe_uses_production_worker_boundary(monkeypatch, capsys) -> None:
-    calls: list[str] = []
+async def test_data_plane_probe_starts_the_real_backend_and_reads_policies(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _configure(monkeypatch, tmp_path)
+    plane = FakeDataPlane()
+    original = entrypoint.DataPlaneClient
 
-    class ProbeWorker:
-        dependency_versions_match = True
+    def client_over_fake(settings: object) -> object:
+        return original(settings, transport=plane)  # type: ignore[arg-type]
 
-        def __init__(self, _lake: Path) -> None:
-            calls.append("init")
+    monkeypatch.setattr(entrypoint, "DataPlaneClient", client_over_fake)
 
-        async def start(self) -> None:
-            calls.append("start")
+    await entrypoint.data_plane_probe()
 
-        async def call(
-            self,
-            tool: str,
-            _arguments: dict[str, object],
-            request_id: str,
-            _timeout: float,
-        ) -> dict[str, object]:
-            calls.extend((tool, request_id))
-            return {"data": {"policies": []}}
-
-        async def close(self) -> None:
-            calls.append("close")
-
-    monkeypatch.setattr(entrypoint, "QueryWorker", ProbeWorker)
-    await entrypoint.worker_interface_probe()
-    assert calls == [
-        "init",
-        "start",
-        "quant_describe_availability",
-        "container-worker-probe",
-        "close",
-    ]
-    assert '"status":"worker_interface_ok"' in capsys.readouterr().out
+    assert '"status":"data_plane_ok"' in capsys.readouterr().out
+    assert plane.calls_to("/v1/policies")

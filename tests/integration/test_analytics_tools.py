@@ -3,12 +3,12 @@ from __future__ import annotations
 import pytest
 
 from stram_quant_mcp.errors import ToolInputError
-from stram_quant_mcp.tool_adapter import QuantToolAdapter
 from stram_quant_mcp.tool_models import ConditionalReturnsEnvelope, PanelEnvelope
+from tests.support.sync_adapter import SyncAdapter
 
 
 def test_aligned_panel_delegates_calendar_and_gap_semantics(
-    tool_adapter: QuantToolAdapter,
+    tool_adapter: SyncAdapter,
 ) -> None:
     result = tool_adapter.execute(
         "quant_get_aligned_panel",
@@ -38,7 +38,7 @@ def test_aligned_panel_delegates_calendar_and_gap_semantics(
 
 
 def test_conditional_returns_preserve_signal_timing_lineage_and_baseline(
-    tool_adapter: QuantToolAdapter,
+    tool_adapter: SyncAdapter,
 ) -> None:
     result = tool_adapter.execute(
         "quant_get_conditional_returns",
@@ -122,7 +122,7 @@ def test_conditional_returns_preserve_signal_timing_lineage_and_baseline(
     ],
 )
 def test_analytics_bounds_fail_before_data_access(
-    tool_adapter: QuantToolAdapter, tool: str, arguments: dict[str, object]
+    tool_adapter: SyncAdapter, tool: str, arguments: dict[str, object]
 ) -> None:
     with pytest.raises(ToolInputError):
         tool_adapter.execute(tool, arguments, "invalid")

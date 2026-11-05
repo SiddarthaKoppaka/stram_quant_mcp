@@ -12,7 +12,6 @@ import pytest
 from pydantic import JsonValue
 
 from stram_quant_mcp.errors import ToolInputError
-from stram_quant_mcp.tool_adapter import QuantToolAdapter
 from stram_quant_mcp.tool_models import (
     CleanCatalogData,
     CleanConditionalReturnsData,
@@ -22,6 +21,7 @@ from stram_quant_mcp.tool_models import (
     CleanSeries,
     CleanSeriesData,
 )
+from tests.support.sync_adapter import SyncAdapter
 
 SERIES = {
     "series_keys": ["CPIAUCSL"],
@@ -63,12 +63,12 @@ Payload = dict[str, Any]
 Arguments = dict[str, JsonValue]
 
 
-def _run(adapter: QuantToolAdapter, tool: str, arguments: Arguments) -> Payload:
+def _run(adapter: SyncAdapter, tool: str, arguments: Arguments) -> Payload:
     result: Payload = adapter.execute(tool, arguments, "request").model_dump(mode="json")
     return result
 
 
-def _clean(adapter: QuantToolAdapter, tool: str, arguments: Arguments) -> Payload:
+def _clean(adapter: SyncAdapter, tool: str, arguments: Arguments) -> Payload:
     data: Payload = _run(adapter, tool, {**arguments, "view": "clean"})["data"]
     return data
 
@@ -90,7 +90,7 @@ def _rebuild_groups(groups: Sequence[CleanSeries | CleanDerivedGroup]) -> list[P
 
 @pytest.mark.parametrize(("tool", "arguments"), CASES)
 def test_raw_view_is_unchanged_when_requested_explicitly(
-    tool_adapter: QuantToolAdapter, tool: str, arguments: Arguments
+    tool_adapter: SyncAdapter, tool: str, arguments: Arguments
 ) -> None:
     default = _run(tool_adapter, tool, arguments)
     explicit = _run(tool_adapter, tool, {**arguments, "view": "raw"})
@@ -101,7 +101,7 @@ def test_raw_view_is_unchanged_when_requested_explicitly(
 
 @pytest.mark.parametrize(("tool", "arguments"), CASES)
 def test_clean_view_keeps_envelope_and_warnings(
-    tool_adapter: QuantToolAdapter, tool: str, arguments: Arguments
+    tool_adapter: SyncAdapter, tool: str, arguments: Arguments
 ) -> None:
     raw = _run(tool_adapter, tool, arguments)
     clean = _run(tool_adapter, tool, {**arguments, "view": "clean"})
@@ -112,7 +112,7 @@ def test_clean_view_keeps_envelope_and_warnings(
     }
 
 
-def test_clean_catalog_rebuilds_every_raw_entry(tool_adapter: QuantToolAdapter) -> None:
+def test_clean_catalog_rebuilds_every_raw_entry(tool_adapter: SyncAdapter) -> None:
     raw = _run(tool_adapter, "quant_list_series", {"limit": 20})["data"]["entries"]
     clean = CleanCatalogData.model_validate(
         _clean(tool_adapter, "quant_list_series", {"limit": 20})
@@ -128,7 +128,7 @@ def test_clean_catalog_rebuilds_every_raw_entry(tool_adapter: QuantToolAdapter) 
 
 
 def test_a_catalog_that_fills_the_limit_says_more_may_exist(
-    tool_adapter: QuantToolAdapter,
+    tool_adapter: SyncAdapter,
 ) -> None:
     clean = CleanCatalogData.model_validate(_clean(tool_adapter, "quant_list_series", {"limit": 1}))
 
@@ -137,7 +137,7 @@ def test_a_catalog_that_fills_the_limit_says_more_may_exist(
     assert "more entries may exist" in clean.explanation
 
 
-def test_a_catalog_below_the_limit_is_not_called_filled(tool_adapter: QuantToolAdapter) -> None:
+def test_a_catalog_below_the_limit_is_not_called_filled(tool_adapter: SyncAdapter) -> None:
     clean = CleanCatalogData.model_validate(
         _clean(tool_adapter, "quant_list_series", {"limit": 500})
     )
@@ -146,7 +146,7 @@ def test_a_catalog_below_the_limit_is_not_called_filled(tool_adapter: QuantToolA
     assert (clean.limit_filled, clean.explanation) == (False, None)
 
 
-def test_clean_series_rebuilds_every_raw_row(tool_adapter: QuantToolAdapter) -> None:
+def test_clean_series_rebuilds_every_raw_row(tool_adapter: SyncAdapter) -> None:
     raw = _run(tool_adapter, "quant_get_series", SERIES)["data"]
     clean = CleanSeriesData.model_validate(_clean(tool_adapter, "quant_get_series", SERIES))
 
@@ -157,7 +157,7 @@ def test_clean_series_rebuilds_every_raw_row(tool_adapter: QuantToolAdapter) -> 
 
 
 def test_clean_derived_rebuilds_every_raw_row_with_exact_values(
-    tool_adapter: QuantToolAdapter,
+    tool_adapter: SyncAdapter,
 ) -> None:
     raw = _run(tool_adapter, "quant_get_derived", DERIVED)["data"]
     clean = CleanDerivedData.model_validate(_clean(tool_adapter, "quant_get_derived", DERIVED))
@@ -170,7 +170,7 @@ def test_clean_derived_rebuilds_every_raw_row_with_exact_values(
     assert _canonical(rebuilt) == _canonical(raw["rows"])
 
 
-def test_clean_derived_values_lose_only_trailing_zeros(tool_adapter: QuantToolAdapter) -> None:
+def test_clean_derived_values_lose_only_trailing_zeros(tool_adapter: SyncAdapter) -> None:
     clean = CleanDerivedData.model_validate(_clean(tool_adapter, "quant_get_derived", DERIVED))
 
     first = dict(zip(clean.groups[0].columns, clean.groups[0].rows[0], strict=True))
@@ -178,7 +178,7 @@ def test_clean_derived_values_lose_only_trailing_zeros(tool_adapter: QuantToolAd
     assert first["value"] == "0.4"
 
 
-def test_clean_panel_rebuilds_every_raw_cell(tool_adapter: QuantToolAdapter) -> None:
+def test_clean_panel_rebuilds_every_raw_cell(tool_adapter: SyncAdapter) -> None:
     raw = _run(tool_adapter, "quant_get_aligned_panel", PANEL)["data"]
     clean = CleanPanelData.model_validate(_clean(tool_adapter, "quant_get_aligned_panel", PANEL))
 
@@ -205,7 +205,7 @@ def test_clean_panel_rebuilds_every_raw_cell(tool_adapter: QuantToolAdapter) -> 
     assert [row[0] for row in clean.rows] == [row["observed_on"] for row in raw["rows"]]
 
 
-def test_clean_panel_tells_absent_cells_from_null_values(tool_adapter: QuantToolAdapter) -> None:
+def test_clean_panel_tells_absent_cells_from_null_values(tool_adapter: SyncAdapter) -> None:
     clean = CleanPanelData.model_validate(_clean(tool_adapter, "quant_get_aligned_panel", PANEL))
 
     ten = next(column for column in clean.column_details if column.name == "ten")
@@ -214,7 +214,7 @@ def test_clean_panel_tells_absent_cells_from_null_values(tool_adapter: QuantTool
     assert ("2026-10-02", "ten") not in {(cell[0], cell[1]) for cell in clean.cells}
 
 
-def test_clean_conditional_returns_keep_every_statistic(tool_adapter: QuantToolAdapter) -> None:
+def test_clean_conditional_returns_keep_every_statistic(tool_adapter: SyncAdapter) -> None:
     raw = _run(tool_adapter, "quant_get_conditional_returns", CONDITIONAL)["data"]
     clean = CleanConditionalReturnsData.model_validate(
         _clean(tool_adapter, "quant_get_conditional_returns", CONDITIONAL)
@@ -228,7 +228,7 @@ def test_clean_conditional_returns_keep_every_statistic(tool_adapter: QuantToolA
     assert clean.notes == tuple(raw["notes"])
 
 
-def test_clean_conditional_returns_rebuild_every_event(tool_adapter: QuantToolAdapter) -> None:
+def test_clean_conditional_returns_rebuild_every_event(tool_adapter: SyncAdapter) -> None:
     raw = _run(tool_adapter, "quant_get_conditional_returns", CONDITIONAL)["data"]
     clean = CleanConditionalReturnsData.model_validate(
         _clean(tool_adapter, "quant_get_conditional_returns", CONDITIONAL)
@@ -248,7 +248,7 @@ def test_clean_conditional_returns_rebuild_every_event(tool_adapter: QuantToolAd
     assert events == raw["events"]
 
 
-def test_an_empty_window_explains_itself(tool_adapter: QuantToolAdapter) -> None:
+def test_an_empty_window_explains_itself(tool_adapter: SyncAdapter) -> None:
     empty = {**SERIES, "start_date": "2001-01-01", "end_date": "2001-01-31"}
 
     clean = CleanSeriesData.model_validate(_clean(tool_adapter, "quant_get_series", empty))
@@ -259,7 +259,7 @@ def test_an_empty_window_explains_itself(tool_adapter: QuantToolAdapter) -> None
     assert "known_since" in clean.explanation
 
 
-def test_a_study_without_events_explains_itself(tool_adapter: QuantToolAdapter) -> None:
+def test_a_study_without_events_explains_itself(tool_adapter: SyncAdapter) -> None:
     never = {
         **CONDITIONAL,
         "conditions": [{"series_key": "UST_10YEAR", "operator": "gt", "threshold": 1000.0}],
@@ -275,11 +275,11 @@ def test_a_study_without_events_explains_itself(tool_adapter: QuantToolAdapter) 
     assert "baseline" in clean.explanation
 
 
-def test_an_unknown_view_is_rejected(tool_adapter: QuantToolAdapter) -> None:
+def test_an_unknown_view_is_rejected(tool_adapter: SyncAdapter) -> None:
     with pytest.raises(ToolInputError):
         tool_adapter.execute("quant_get_series", {**SERIES, "view": "pretty"}, "request")
 
 
-def test_tools_without_a_clean_view_reject_the_option(tool_adapter: QuantToolAdapter) -> None:
+def test_tools_without_a_clean_view_reject_the_option(tool_adapter: SyncAdapter) -> None:
     with pytest.raises(ToolInputError):
         tool_adapter.execute("quant_get_freshness", {"view": "clean"}, "request")

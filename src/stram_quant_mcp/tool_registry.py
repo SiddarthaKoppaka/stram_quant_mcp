@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel
 
+from stram_quant_mcp.tool_docs import TOOL_DOCS
 from stram_quant_mcp.tool_models import (
     AvailabilityPoliciesEnvelope,
     CatalogEnvelope,
@@ -64,7 +65,7 @@ class ToolSpec:
 TOOL_SPECS = (
     ToolSpec(
         "quant_list_series",
-        "List bounded quantitative series metadata from the read-only catalog.",
+        TOOL_DOCS["quant_list_series"].render(),
         "quant:discover",
         CatalogInput,
         CatalogEnvelope,
@@ -72,7 +73,7 @@ TOOL_SPECS = (
     ),
     ToolSpec(
         "quant_list_indicators",
-        "List derived quantitative indicators and their coverage.",
+        TOOL_DOCS["quant_list_indicators"].render(),
         "quant:discover",
         EmptyInput,
         IndicatorsEnvelope,
@@ -80,7 +81,7 @@ TOOL_SPECS = (
     ),
     ToolSpec(
         "quant_list_indicator_subjects",
-        "List subjects available for one derived indicator.",
+        TOOL_DOCS["quant_list_indicator_subjects"].render(),
         "quant:discover",
         IndicatorSubjectsInput,
         IndicatorSubjectsEnvelope,
@@ -88,7 +89,7 @@ TOOL_SPECS = (
     ),
     ToolSpec(
         "quant_describe_availability",
-        "Describe the versioned historical-availability policies in force.",
+        TOOL_DOCS["quant_describe_availability"].render(),
         "quant:discover",
         EmptyInput,
         AvailabilityPoliciesEnvelope,
@@ -96,7 +97,7 @@ TOOL_SPECS = (
     ),
     ToolSpec(
         "quant_get_freshness",
-        "Report quantitative dataset freshness and known limitations.",
+        TOOL_DOCS["quant_get_freshness"].render(),
         "quant:discover",
         EmptyInput,
         FreshnessEnvelope,
@@ -104,7 +105,7 @@ TOOL_SPECS = (
     ),
     ToolSpec(
         "quant_get_series",
-        "Read bounded quantitative series with revisions and availability semantics preserved.",
+        TOOL_DOCS["quant_get_series"].render(),
         "quant:read",
         SeriesInput,
         SeriesEnvelope,
@@ -112,7 +113,7 @@ TOOL_SPECS = (
     ),
     ToolSpec(
         "quant_get_derived",
-        "Read one bounded derived indicator with exact values and lineage identifiers.",
+        TOOL_DOCS["quant_get_derived"].render(),
         "quant:read",
         DerivedInput,
         DerivedEnvelope,
@@ -120,7 +121,7 @@ TOOL_SPECS = (
     ),
     ToolSpec(
         "quant_get_lineage",
-        "Resolve source observations behind one derived event identifier.",
+        TOOL_DOCS["quant_get_lineage"].render(),
         "quant:lineage",
         LineageInput,
         LineageEnvelope,
@@ -128,7 +129,7 @@ TOOL_SPECS = (
     ),
     ToolSpec(
         "quant_get_aligned_panel",
-        "Align bounded quantitative series on an explicit calendar with bounded gap handling.",
+        TOOL_DOCS["quant_get_aligned_panel"].render(),
         "quant:analytics",
         PanelInput,
         PanelEnvelope,
@@ -136,7 +137,7 @@ TOOL_SPECS = (
     ),
     ToolSpec(
         "quant_get_conditional_returns",
-        "Compute bounded forward returns after conditions became known, with a baseline.",
+        TOOL_DOCS["quant_get_conditional_returns"].render(),
         "quant:analytics",
         ConditionalReturnsInput,
         ConditionalReturnsEnvelope,

@@ -1,0 +1,58 @@
+{
+  "service_version": "1.9.0",
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/v1/catalog",
+      "scope": "catalog:read"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/indicators",
+      "scope": "derived:read"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/indicators/{indicator_id}/subjects",
+      "scope": "derived:read"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/policies",
+      "scope": "catalog:read"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/freshness",
+      "scope": "catalog:read"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/lineage/{event_id}",
+      "scope": "lineage:read"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/series/query",
+      "scope": "series:read"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/derived/query",
+      "scope": "derived:read"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/panel/query",
+      "scope": "analytics:read"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/conditional-returns/query",
+      "scope": "analytics:read"
+    }
+  ],
+  "optional_scopes": [
+    "hindsight:read"
+  ]
+}

@@ -13,7 +13,7 @@ records evidence.
 
 ## Build and release gates
 
-Use the frozen lock and exact `stram-data` 1.3.1 pin:
+Use the frozen lock and exact `stram-data` 1.9.0 pin (typed models only; no query runs in this process):
 
 ```bash
 uv sync --frozen --dev
@@ -50,7 +50,10 @@ Required service variables are:
 
 | Variable | Purpose |
 |---|---|
-| `STRAM_MCP_PARQUET_ROOT` | Explicit lake root, `/lake` in the container |
+| `STRAM_MCP_DATA_URL` | Data Plane service base URL (HTTPS outside loopback tests) |
+| `STRAM_MCP_DATA_TOKEN_URL` | Keycloak token endpoint for this service's `client_credentials` token |
+| `STRAM_MCP_DATA_CLIENT_ID` | This service's Keycloak client id |
+| `STRAM_MCP_DATA_CLIENT_SECRET_FILE` | Read-only mounted client secret file, never an environment value |
 | `STRAM_MCP_AUDIT_DB` | SQLite audit journal, on the writable audit volume |
 | `STRAM_MCP_AUDIT_KEY_FILE` | Separate read-only HMAC key file, minimum 32 bytes |
 | `STRAM_MCP_ISSUER_URL` | Exact HTTPS token issuer |
@@ -60,8 +63,9 @@ Required service variables are:
 | `STRAM_MCP_ALLOWED_HOSTS` | Comma-separated Host allowlist |
 
 Optional production controls include allowed browser origins/algorithms, image digest, OTLP endpoint,
-worker restart cap/backoff/shutdown budget, bind host and port. Defaults are three consecutive worker
-replacements, 0.25-second replacement delay and five-second shutdown drain. Security and correctness
+Data Plane concurrency, connect timeout, circuit-breaker threshold and cooldown, shutdown budget, bind
+host and port. Defaults are four concurrent calls, a five-failure breaker with a 15-second cooldown and
+a five-second shutdown drain. Security and correctness
 defaults require review before change; update policy/release evidence with any change.
 
 Use [service.env.example](../../deploy/service.env.example) and
@@ -73,12 +77,12 @@ They contain no bearer token or audit key.
 The container `serve` command runs preflight before opening the listener. It fails unless:
 
 - effective UID is non-root;
-- the container root and lake are distinct read-only mounts;
-- the exact `stram-data` and Data Interface versions match;
-- the real public interface can describe availability policies.
+- the container root filesystem is read-only;
+- the configuration parses and the Data Plane client secret file exists.
 
-Application lifespan then verifies the audit chain, starts the worker, checks dependency versions and
-policy hash, and warms JWKS. Only then is readiness true.
+Preflight contacts no service. Application lifespan then verifies the audit chain, reads the Data
+Plane's OpenAPI document, requires service 1.9 or later and Data Interface v1, reads the availability
+policies with a real service token, and warms JWKS. Only then is readiness true.
 
 ```bash
 curl --fail --silent http://127.0.0.1:8800/health/live
@@ -100,6 +104,10 @@ Tailscale or firewall state under the managed sandbox. Treat Tailscale Serve, DN
 proxy policy and IPv4/IPv6/DNS egress as not verified until the operator runs the privileged `doctor`
 and records the administrator-owned ruleset. Do not recreate the verified Quant identity, lake mount,
 audit objects or review image merely because this sandbox cannot inspect their protected state.
+
+> **Superseded in part.** This service no longer needs the lake mount described below, which belongs
+> to the Data Plane service. The Quadlet and `deploy/` scripts still describe the former lake mount and
+> are pending an authorized update. See [Architecture](../explanation/architecture.md).
 
 ### Required identity and mount design
 
@@ -142,25 +150,20 @@ is unreadable for writes and the audit volume is writable by the mapped containe
 the unit. Do not solve mapping failures with world-writable permissions or ownership changes to the
 Data Plane.
 
-The query worker has an additional kernel boundary. Build the exact image, then run:
+The container has no lake mount and no query engine. Prove its boundaries instead:
 
 ```bash
 docker run --rm --read-only \
   --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
   --cap-drop ALL --security-opt no-new-privileges \
-  stram-quant-mcp:review worker-network-probe
+  --env-file service.env stram-quant-mcp:review data-plane-probe
 ```
 
-Expected: `{"status":"worker_network_isolated"}`. The command installs the production seccomp filter
-and directly invokes libc `socket` and `io_uring_setup`; both must return kernel `EPERM`. During a
-staging call, also record `Seccomp: 2` and a nonzero `Seccomp_filters` for the query-worker PID from
-`/proc/PID/status`. These checks prove the worker boundary; separate egress tests prove the container
-HTTP-process policy.
-
-Then mount the synthetic lake read-only with container networking disabled and run
-`worker-interface-probe`. Expected: `{"status":"worker_interface_ok"}`. This starts the same spawned
-worker used by the server after its seccomp filter is installed and calls the pinned public Data
-Interface; it detects a filter that breaks legitimate DuckDB/Parquet work.
+Expected: `{"status":"data_plane_ok"}`. The command starts the production backend, obtains a service token
+and reads the availability policies from the live Data Plane. Separate egress tests must show that
+the container can reach only the identity provider's token endpoint, the Data Plane service and the
+telemetry collector. A failure prints a classified error, for example `service_credentials_rejected`
+when the client secret, audience or scopes are wrong.
 
 The older Docker user-systemd template is retained for reference under `deploy/systemd/`; it is not
 the approved SIDDU runtime. See [Deployment](../../deploy/README.md) for the staging checklist.
@@ -251,21 +254,32 @@ Rotation starts a new explicit chain:
 
 Rollback across rotation restores image, configuration, journal and matching key as one unit.
 
-## Worker recovery and shutdown
+## Data Plane recovery and shutdown
 
-One worker executes one Data Interface call at a time. Queue wait, per-tool deadline, response bytes,
-memory, restart cap/backoff and shutdown drain are bounded. A timeout or crash kills the old worker.
-After the configured number of consecutive replacements, the restart circuit opens and readiness
-becomes false. One valid worker response resets the consecutive counter.
+Calls run through at most the configured number of concurrent slots; extra calls wait briefly and then
+fail as `overloaded`. Each tool has a hard deadline. After the configured number of consecutive Data
+Plane failures the circuit breaker opens: calls fail fast as a retryable `unavailable` error with the
+remaining wait, one probe call is allowed after the cooldown, and one success closes the breaker.
+Readiness stays true while the breaker is open, because an upstream outage must not restart this
+service.
 
-On SIGTERM, the server first becomes unready, stops normal listener admission, drains the worker up to
-the configured budget, then terminates/kills it, closes audit and flushes telemetry best effort.
-Cancellation and forced shutdown cannot leave a replacement worker behind. Data queries and audit
-appends are never automatically retried.
+On SIGTERM, the server first becomes unready, stops normal listener admission, drains in-flight calls
+up to the configured budget, closes the HTTP client and audit journal and flushes telemetry best effort.
+Data queries and audit appends are never automatically retried, apart from one token refresh and one
+connection-reset retry inside a single call.
 
-For a deadline or crash, verify the terminal audit outcome and whether the replacement is ready. For
-repeated failures, remove the instance from rotation and preserve image/config version, restart count,
-request/trace IDs and audit checkpoint. Do not collect raw arguments, results or tokens.
+Diagnose by the error `category` in the audit outcome and telemetry:
+
+| Category | Operator action |
+|---|---|
+| `service_credentials` | Check the client secret file, audience, issuer and the scopes granted to the client. Do not restart repeatedly. |
+| `data_plane_unavailable` | Check the Data Plane service, Keycloak and the network path; the breaker closes by itself. |
+| `data_plane_error` | Capture the MCP `request_id` and the `upstream_request_id`; inspect Data Plane logs. A contract mismatch means an incompatible Data Plane version. |
+| `deadline` | Look for slow queries or an overloaded Data Plane before raising any deadline. |
+| `capacity` | Check concurrency and caller rate; do not raise limits without review. |
+
+For repeated failures, remove the instance from rotation and preserve image/config version, request and
+trace IDs and the audit checkpoint. Do not collect raw arguments, results or tokens.
 
 ## Telemetry and alerting
 

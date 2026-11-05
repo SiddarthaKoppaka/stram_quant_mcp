@@ -10,32 +10,17 @@ from mcp.server.auth.provider import AccessToken
 
 from stram_quant_mcp.audit import AuditJournal
 from stram_quant_mcp.errors import ToolForbiddenError, ToolOverloadedError
+from stram_quant_mcp.http_backend import HttpDataBackend
 from stram_quant_mcp.policy import InvocationService, RateLimiter
-from stram_quant_mcp.settings import AppSettings
-from stram_quant_mcp.worker import QueryWorker
+from tests.support.settings import make_settings
 
 
-class CancellableWorker:
+class CancellableBackend:
     policy_version = "test-policy"
 
     async def call(self, *_args: object) -> dict[str, object]:
         await asyncio.Event().wait()
         return {}
-
-
-def _settings(tmp_path: Path) -> AppSettings:
-    return AppSettings(
-        parquet_root=Path(__file__).parents[1] / "fixtures/lake",
-        audit_db_path=tmp_path / "audit.sqlite3",
-        audit_key_path=tmp_path / "audit.key",
-        issuer_url="http://testserver/issuer",
-        resource_url="http://testserver/mcp",
-        jwks_url="http://testserver/jwks",
-        tenant_id="stram",
-        allowed_hosts=("testserver",),
-        allow_insecure_http=True,
-        image_digest="sha256:test",
-    )
 
 
 def _token(*, scopes: list[str], tenant: str = "stram") -> AccessToken:
@@ -70,11 +55,12 @@ def test_rate_limiter_bounds_principals_and_evicts_idle_entries() -> None:
 
 
 @pytest.mark.asyncio
-async def test_scope_and_tenant_are_enforced_before_dispatch_and_audited(tmp_path) -> None:
-    settings = _settings(tmp_path)
+async def test_scope_and_tenant_are_enforced_before_dispatch_and_audited(
+    tmp_path: Path, backend: HttpDataBackend
+) -> None:
+    settings = make_settings(tmp_path)
     audit = AuditJournal(settings.audit_db_path, b"k" * 32)
-    worker = QueryWorker(settings.parquet_root)
-    service = InvocationService(settings, worker, audit, RateLimiter(30, 10))
+    service = InvocationService(settings, backend, audit, RateLimiter(30, 10))
 
     with pytest.raises(ToolForbiddenError):
         await service.invoke("quant_list_series", {}, "wrong-scope", _token(scopes=["quant:read"]))
@@ -96,19 +82,16 @@ async def test_scope_and_tenant_are_enforced_before_dispatch_and_audited(tmp_pat
 
 
 @pytest.mark.asyncio
-async def test_success_and_rate_limit_each_create_one_terminal_record(tmp_path) -> None:
-    settings = _settings(tmp_path)
+async def test_success_and_rate_limit_each_create_one_terminal_record(
+    tmp_path: Path, backend: HttpDataBackend
+) -> None:
+    settings = make_settings(tmp_path)
     audit = AuditJournal(settings.audit_db_path, b"k" * 32)
-    worker = QueryWorker(settings.parquet_root)
-    await worker.start()
-    service = InvocationService(settings, worker, audit, RateLimiter(1, 10))
+    service = InvocationService(settings, backend, audit, RateLimiter(1, 10))
     token = _token(scopes=["quant:discover"])
-    try:
-        result = await service.invoke("quant_list_series", {"limit": 1}, "success", token)
-        with pytest.raises(ToolOverloadedError):
-            await service.invoke("quant_list_series", {"limit": 1}, "limited", token)
-    finally:
-        await worker.close()
+    result = await service.invoke("quant_list_series", {"limit": 1}, "success", token)
+    with pytest.raises(ToolOverloadedError):
+        await service.invoke("quant_list_series", {"limit": 1}, "limited", token)
 
     records = _records(settings.audit_db_path)
     audit.close()
@@ -119,11 +102,11 @@ async def test_success_and_rate_limit_each_create_one_terminal_record(tmp_path) 
 
 
 @pytest.mark.asyncio
-async def test_cancelled_invocation_creates_one_terminal_record(tmp_path) -> None:
-    settings = _settings(tmp_path)
+async def test_cancelled_invocation_creates_one_terminal_record(tmp_path: Path) -> None:
+    settings = make_settings(tmp_path)
     audit = AuditJournal(settings.audit_db_path, b"k" * 32)
     service = InvocationService(  # type: ignore[arg-type] - deterministic cancellation boundary
-        settings, CancellableWorker(), audit, RateLimiter(30, 10)
+        settings, CancellableBackend(), audit, RateLimiter(30, 10)
     )
     invocation = asyncio.create_task(
         service.invoke(

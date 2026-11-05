@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
 
+import httpx
 from fastmcp import FastMCP
 from fastmcp.server.auth.providers.jwt import JWTVerifier
 from starlette.requests import Request
@@ -19,6 +20,7 @@ from starlette.types import ASGIApp
 
 from stram_quant_mcp.access_policy import AccessPolicyStore, ScopeGrantStore
 from stram_quant_mcp.audit import AuditJournal
+from stram_quant_mcp.data_client import DataPlaneClient, DataPlaneSettings
 from stram_quant_mcp.denial_throttle import DenialThrottle
 from stram_quant_mcp.fastmcp_audit import PreDispatchAuditor
 from stram_quant_mcp.fastmcp_auth import StrictVerifier, build_auth_provider, warm_jwks
@@ -28,6 +30,7 @@ from stram_quant_mcp.fastmcp_middleware import (
     TelemetryMiddleware,
 )
 from stram_quant_mcp.fastmcp_tools import register_tools
+from stram_quant_mcp.http_backend import BackendLimits, HttpDataBackend
 from stram_quant_mcp.http_boundary import HttpTelemetryMiddleware, TransportDenialAuditMiddleware
 from stram_quant_mcp.policy import InvocationService, RateLimiter
 from stram_quant_mcp.request_limits import BodyLimitMiddleware
@@ -35,7 +38,6 @@ from stram_quant_mcp.runtime import Runtime
 from stram_quant_mcp.settings import AppSettings, load_secret_file
 from stram_quant_mcp.telemetry import Telemetry
 from stram_quant_mcp.version import __version__
-from stram_quant_mcp.worker import QueryWorker
 
 MCP_PATH = "/mcp"
 FRAMEWORK_LOGGER = "fastmcp"
@@ -50,13 +52,14 @@ class FastMcpApplication:
     runtime: Runtime
 
 
-def create_fastmcp_application(
+def create_fastmcp_application(  # noqa: PLR0913 - each is an independent optional test seam
     settings: AppSettings,
     *,
     token_verifier: JWTVerifier | None = None,
     audit_key: bytes | None = None,
     telemetry: Telemetry | None = None,
     policy_store: AccessPolicyStore | None = None,
+    data_transport: httpx.AsyncBaseTransport | None = None,
 ) -> FastMcpApplication:
     """Build the complete fail-closed ASGI service without starting a network listener.
 
@@ -66,13 +69,14 @@ def create_fastmcp_application(
         audit_key: The audit HMAC key; read from the configured file when omitted.
         telemetry: A telemetry sink; disabled when omitted.
         policy_store: The authority on grants; the tool-scope store when omitted.
+        data_transport: An HTTP transport for the Data Plane client; used only in tests.
 
     Returns:
         The ASGI application with its server and runtime.
     """
     # The framework logs exception text and tracebacks; this service's own safe events replace them.
     logging.getLogger(FRAMEWORK_LOGGER).setLevel(logging.CRITICAL)
-    runtime = _build_runtime(settings, audit_key, telemetry or Telemetry.disabled())
+    runtime = _build_runtime(settings, audit_key, telemetry or Telemetry.disabled(), data_transport)
     verifier = token_verifier or StrictVerifier(settings)
     warm_on_start = token_verifier is None
     server = FastMCP(
@@ -101,26 +105,43 @@ def create_fastmcp_application(
     return FastMcpApplication(app=app, server=server, runtime=runtime)
 
 
-def _build_runtime(settings: AppSettings, audit_key: bytes | None, telemetry: Telemetry) -> Runtime:
+def _build_runtime(
+    settings: AppSettings,
+    audit_key: bytes | None,
+    telemetry: Telemetry,
+    data_transport: httpx.AsyncBaseTransport | None,
+) -> Runtime:
     key = audit_key if audit_key is not None else load_secret_file(settings.audit_key_path)
     audit = AuditJournal(settings.audit_db_path, key)
-    worker = QueryWorker(
-        settings.parquet_root,
-        queue_wait_seconds=settings.queue_wait_seconds,
-        max_queued=settings.max_queued,
-        max_response_bytes=settings.max_response_bytes,
-        memory_limit_mb=settings.worker_memory_mb,
-        max_restarts=settings.worker_max_restarts,
-        restart_backoff_seconds=settings.worker_restart_backoff_seconds,
+    client = DataPlaneClient(
+        DataPlaneSettings(
+            base_url=settings.data_url,
+            token_url=settings.data_token_url,
+            client_id=settings.data_client_id,
+            client_secret_path=settings.data_client_secret_path,
+            connect_timeout_seconds=settings.data_connect_timeout_seconds,
+            max_response_bytes=settings.max_response_bytes,
+            allow_insecure_http=settings.allow_insecure_http,
+        ),
+        transport=data_transport,
+    )
+    backend = HttpDataBackend(
+        client,
+        BackendLimits(
+            max_concurrent=settings.data_max_concurrent,
+            queue_wait_seconds=settings.queue_wait_seconds,
+            breaker_threshold=settings.data_breaker_threshold,
+            breaker_cooldown_seconds=settings.data_breaker_cooldown_seconds,
+        ),
     )
     limiter = RateLimiter(settings.rate_limit_per_minute, settings.max_rate_principals)
-    invocations = InvocationService(settings, worker, audit, limiter)
-    return Runtime(settings, worker, audit, invocations, telemetry)
+    invocations = InvocationService(settings, backend, audit, limiter)
+    return Runtime(settings, backend, audit, invocations, telemetry)
 
 
 def _build_auditor(runtime: Runtime) -> PreDispatchAuditor:
     return PreDispatchAuditor(
-        runtime.settings, runtime.audit, lambda: runtime.worker.policy_version
+        runtime.settings, runtime.audit, lambda: runtime.backend.policy_version
     )
 
 
@@ -150,7 +171,7 @@ def _build_lifespan(
         runtime.audit.verify()
         runtime.audit.probe_write()
         try:
-            await runtime.worker.start()
+            await runtime.backend.start()
             _require_matching_worker(runtime)
             if warm_on_start:
                 await warm_jwks(str(settings.jwks_url))
@@ -160,7 +181,7 @@ def _build_lifespan(
         finally:
             runtime.accepting = False
             runtime.telemetry.set_ready(False)
-            await runtime.worker.close(settings.worker_shutdown_seconds)
+            await runtime.backend.close(settings.backend_shutdown_seconds)
             runtime.audit.close()
             await runtime.telemetry.shutdown()
 
@@ -168,9 +189,9 @@ def _build_lifespan(
 
 
 def _require_matching_worker(runtime: Runtime) -> None:
-    worker = runtime.worker
-    if worker.policy_version == "unknown" or not worker.dependency_versions_match:
-        raise RuntimeError("query worker contract or policy version does not match")
+    backend = runtime.backend
+    if backend.policy_version == "unknown" or not backend.dependency_versions_match:
+        raise RuntimeError("Data Plane contract or policy version does not match")
 
 
 def _register_health_routes(server: FastMCP, runtime: Runtime) -> None:

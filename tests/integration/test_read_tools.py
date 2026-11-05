@@ -5,7 +5,6 @@ from decimal import Decimal
 import pytest
 
 from stram_quant_mcp.errors import ToolInputError, ToolNotFoundError
-from stram_quant_mcp.tool_adapter import QuantToolAdapter
 from stram_quant_mcp.tool_models import (
     AvailabilityPoliciesEnvelope,
     CatalogEnvelope,
@@ -16,10 +15,11 @@ from stram_quant_mcp.tool_models import (
     LineageEnvelope,
     SeriesEnvelope,
 )
+from tests.support.sync_adapter import SyncAdapter
 
 
 def test_all_eight_read_and_discovery_tools_use_the_real_interface(
-    tool_adapter: QuantToolAdapter,
+    tool_adapter: SyncAdapter,
 ) -> None:
     catalog = tool_adapter.execute("quant_list_series", {"limit": 20}, "catalog")
     assert isinstance(catalog, CatalogEnvelope)
@@ -101,7 +101,7 @@ def test_all_eight_read_and_discovery_tools_use_the_real_interface(
     assert lineage.data.unresolved_input_ids == ()
 
 
-def test_truncation_and_hindsight_are_explicit(tool_adapter: QuantToolAdapter) -> None:
+def test_truncation_and_hindsight_are_explicit(tool_adapter: SyncAdapter) -> None:
     truncated = tool_adapter.execute(
         "quant_get_series",
         {
@@ -134,7 +134,7 @@ def test_truncation_and_hindsight_are_explicit(tool_adapter: QuantToolAdapter) -
 
 
 def test_strict_prevents_lookahead_and_estimated_preserves_evidence(
-    tool_adapter: QuantToolAdapter,
+    tool_adapter: SyncAdapter,
 ) -> None:
     common = {
         "series_keys": ["UST_10YEAR"],
@@ -193,7 +193,7 @@ def test_strict_prevents_lookahead_and_estimated_preserves_evidence(
     ],
 )
 def test_invalid_series_requests_fail_with_one_safe_error(
-    tool_adapter: QuantToolAdapter, arguments: dict[str, object]
+    tool_adapter: SyncAdapter, arguments: dict[str, object]
 ) -> None:
     with pytest.raises(ToolInputError) as error:
         tool_adapter.execute("quant_get_series", arguments, "bad")
@@ -201,7 +201,7 @@ def test_invalid_series_requests_fail_with_one_safe_error(
     assert "select" not in error.value.public_message.lower()
 
 
-def test_unknown_entities_and_tools_have_stable_errors(tool_adapter: QuantToolAdapter) -> None:
+def test_unknown_entities_and_tools_have_stable_errors(tool_adapter: SyncAdapter) -> None:
     with pytest.raises(ToolNotFoundError):
         tool_adapter.execute(
             "quant_list_indicator_subjects", {"indicator_id": "not_real"}, "missing"
