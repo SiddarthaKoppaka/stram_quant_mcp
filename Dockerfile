@@ -6,9 +6,10 @@ FROM ${PYTHON_BASE} AS builder
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 RUN sed -i \
-      -e 's|http://deb.debian.org/debian-security|https://snapshot.debian.org/archive/debian-security/20261031T000000Z|g' \
-      -e 's|http://deb.debian.org/debian|https://snapshot.debian.org/archive/debian/20261031T000000Z|g' \
+      -e 's|http://deb.debian.org/debian-security|https://snapshot.debian.org/archive/debian-security/20261105T000000Z|g' \
+      -e 's|http://deb.debian.org/debian|https://snapshot.debian.org/archive/debian/20261105T000000Z|g' \
       /etc/apt/sources.list.d/debian.sources \
+    && echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries \
     && apt-get update \
     && apt-get upgrade --yes --no-install-recommends \
     && apt-get install --yes --no-install-recommends ca-certificates git \
@@ -38,12 +39,13 @@ LABEL org.opencontainers.image.title="Stram Quant MCP" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.base.name="python:3.12.12-slim-bookworm" \
       org.opencontainers.image.base.digest="sha256:593bd06efe90efa80dc4eee3948be7c0fde4134606dd40d8dd8dbcade98e669c" \
-      io.stram.debian.snapshot="20261031T000000Z"
+      io.stram.debian.snapshot="20261105T000000Z"
 
 RUN sed -i \
-      -e 's|http://deb.debian.org/debian-security|https://snapshot.debian.org/archive/debian-security/20261031T000000Z|g' \
-      -e 's|http://deb.debian.org/debian|https://snapshot.debian.org/archive/debian/20261031T000000Z|g' \
+      -e 's|http://deb.debian.org/debian-security|https://snapshot.debian.org/archive/debian-security/20261105T000000Z|g' \
+      -e 's|http://deb.debian.org/debian|https://snapshot.debian.org/archive/debian/20261105T000000Z|g' \
       /etc/apt/sources.list.d/debian.sources \
+    && echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries \
     && apt-get update \
     && apt-get upgrade --yes --no-install-recommends \
     && apt-get install --yes --no-install-recommends libpq5 \
