@@ -2,24 +2,17 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import cast
 
-import stram_data
 from pydantic import BaseModel, ValidationError
 from stram_data.data_interface import (
     INTERFACE_VERSION,
     Condition,
     ConditionalReturnsQuery,
     ConditionalReturnsResult,
-    DataInterface,
-    DataUnavailableError,
     DerivedQuery,
     DerivedResult,
-    InvalidQueryError,
-    NotFoundError,
     PanelColumn,
     PanelQuery,
     PanelResult,
@@ -34,7 +27,9 @@ from stram_quant_mcp.clean_views import (
     clean_panel,
     clean_series,
 )
-from stram_quant_mcp.errors import ToolInputError, ToolNotFoundError, ToolUnavailableError
+from stram_quant_mcp.data_gateway import DataGateway
+from stram_quant_mcp.errors import ToolInputError, ToolUpstreamError
+from stram_quant_mcp.input_validation import describe_validation_error
 from stram_quant_mcp.tool_models import (
     AvailabilityPoliciesData,
     CatalogData,
@@ -51,38 +46,52 @@ from stram_quant_mcp.tool_models import (
 from stram_quant_mcp.tool_registry import TOOLS_BY_NAME
 from stram_quant_mcp.version import __version__
 
+Handler = Callable[[BaseModel, float], Awaitable[BaseModel]]
+
 
 class QuantToolAdapter:
-    """Execute reviewed tool calls without adding quantitative behavior."""
+    """Execute reviewed tool calls over the Data Plane without adding quantitative behavior."""
 
-    def __init__(self, data: DataInterface) -> None:
-        self._data = data
-        descriptions = [
-            item.model_dump(mode="json") for item in data.describe_availability_policies()
-        ]
-        encoded = json.dumps(descriptions, sort_keys=True, separators=(",", ":")).encode()
-        self._policy_version = hashlib.sha256(encoded).hexdigest()[:16]
+    def __init__(self, gateway: DataGateway, *, policy_version: str, service_version: str) -> None:
+        """Serve tools through ``gateway``, labelling envelopes with the versions given."""
+        self._gateway = gateway
+        self._policy_version = policy_version
+        self._service_version = service_version
 
     @property
     def policy_version(self) -> str:
         return self._policy_version
 
-    def execute(self, tool_name: str, arguments: object, request_id: str) -> BaseModel:
+    async def execute(
+        self, tool_name: str, arguments: object, request_id: str, deadline_seconds: float
+    ) -> BaseModel:
+        """Validate the input, call the Data Plane, and validate the complete envelope.
+
+        Raises:
+            ToolInputError: The arguments, or the Data Plane, rejected the request; the reason
+                names the field and rule.
+            QuantToolError: Any classified Data Plane failure, unchanged.
+        """
         spec = TOOLS_BY_NAME.get(tool_name)
         if spec is None:
-            raise ToolInputError from None
+            raise ToolInputError(f"{tool_name[:60]!r} is not a tool of this service.") from None
         try:
             request = spec.input_model.model_validate(arguments)
-            # The view selects the response shape only; the Data Interface never sees it.
-            data = self._dispatch(tool_name, request)
-            # Warnings come from the raw result, so both views carry the same ones.
-            warnings = _warnings(data)
+        except ValidationError as error:
+            raise ToolInputError(describe_validation_error(error)) from None
+        try:
+            data = await self._dispatch(tool_name, request, deadline_seconds)
+        except ValidationError as error:
+            raise ToolInputError(describe_validation_error(error)) from None
+        # Warnings come from the raw result, so both views carry the same ones.
+        warnings = _warnings(data)
+        try:
             if getattr(request, "view", "raw") == "clean":
                 data = _clean(data, request)
-            envelope = spec.output_model.model_validate(
+            return spec.output_model.model_validate(
                 {
                     "tool_version": __version__,
-                    "stram_data_version": stram_data.__version__,
+                    "stram_data_version": self._service_version,
                     "interface_version": INTERFACE_VERSION,
                     "policy_version": self._policy_version,
                     "request_id": request_id,
@@ -90,76 +99,95 @@ class QuantToolAdapter:
                     "warnings": warnings,
                 }
             )
-        except (ValidationError, InvalidQueryError) as error:
-            raise ToolInputError from error
-        except NotFoundError as error:
-            raise ToolNotFoundError from error
-        except DataUnavailableError as error:
-            raise ToolUnavailableError from error
-        return envelope
+        except ValidationError as error:
+            raise ToolUpstreamError(
+                "The result could not be shaped into the reviewed output schema "
+                f"({describe_validation_error(error)})."
+            ) from None
 
-    def _dispatch(self, tool_name: str, request: BaseModel) -> BaseModel:
-        dispatch: dict[str, Callable[[], BaseModel]] = {
-            "quant_list_series": lambda: self._catalog(cast(CatalogInput, request)),
-            "quant_list_indicators": lambda: IndicatorsData(
-                indicators=self._data.list_indicators()
-            ),
-            "quant_list_indicator_subjects": lambda: self._subjects(
-                cast(IndicatorSubjectsInput, request)
-            ),
-            "quant_describe_availability": lambda: AvailabilityPoliciesData(
-                policies=self._data.describe_availability_policies()
-            ),
-            "quant_get_freshness": self._data.get_freshness,
-            "quant_get_series": lambda: self._series(cast(SeriesInput, request)),
-            "quant_get_derived": lambda: self._derived(cast(DerivedInput, request)),
-            "quant_get_lineage": lambda: self._data.get_lineage(
-                str(cast(LineageInput, request).event_id)
-            ),
-            "quant_get_aligned_panel": lambda: self._panel(cast(PanelInput, request)),
-            "quant_get_conditional_returns": lambda: self._conditional_returns(
-                cast(ConditionalReturnsInput, request)
-            ),
+    async def _dispatch(
+        self, tool_name: str, request: BaseModel, deadline_seconds: float
+    ) -> BaseModel:
+        handler = self._handlers().get(tool_name)
+        if handler is None:
+            raise ToolInputError(f"{tool_name[:60]!r} has no Data Plane route.") from None
+        return await handler(request, deadline_seconds)
+
+    def _handlers(self) -> dict[str, Handler]:
+        return {
+            "quant_list_series": self._catalog,
+            "quant_list_indicators": self._indicators,
+            "quant_list_indicator_subjects": self._subjects,
+            "quant_describe_availability": self._policies,
+            "quant_get_freshness": self._freshness,
+            "quant_get_series": self._series,
+            "quant_get_derived": self._derived,
+            "quant_get_lineage": self._lineage,
+            "quant_get_aligned_panel": self._panel,
+            "quant_get_conditional_returns": self._conditional_returns,
         }
-        try:
-            operation = dispatch[tool_name]
-        except KeyError as error:
-            raise ToolInputError from error
-        return operation()
 
-    def _catalog(self, request: CatalogInput) -> CatalogData:
-        return CatalogData(
-            entries=self._data.get_catalog(dataset=request.dataset, limit=request.limit)
+    async def _catalog(self, request: BaseModel, deadline: float) -> BaseModel:
+        catalog = cast(CatalogInput, request)
+        entries = await self._gateway.get_catalog(
+            dataset=catalog.dataset, limit=catalog.limit, deadline_seconds=deadline
+        )
+        return CatalogData(entries=entries)
+
+    async def _indicators(self, _request: BaseModel, deadline: float) -> BaseModel:
+        return IndicatorsData(
+            indicators=await self._gateway.list_indicators(deadline_seconds=deadline)
         )
 
-    def _subjects(self, request: IndicatorSubjectsInput) -> IndicatorSubjectsData:
-        return IndicatorSubjectsData(
-            subjects=self._data.list_indicator_subjects(request.indicator_id)
-        )
+    async def _subjects(self, request: BaseModel, deadline: float) -> BaseModel:
+        indicator = cast(IndicatorSubjectsInput, request).indicator_id
+        found = await self._gateway.list_indicator_subjects(indicator, deadline_seconds=deadline)
+        return IndicatorSubjectsData(subjects=found)
 
-    def _series(self, request: SeriesInput) -> SeriesResult:
-        return self._data.get_series(
-            SeriesQuery.model_validate(request.model_dump(exclude={"view"}))
-        )
+    async def _policies(self, _request: BaseModel, deadline: float) -> BaseModel:
+        policies = await self._gateway.describe_availability_policies(deadline_seconds=deadline)
+        return AvailabilityPoliciesData(policies=policies)
 
-    def _derived(self, request: DerivedInput) -> DerivedResult:
-        return self._data.get_derived(
-            DerivedQuery.model_validate(request.model_dump(exclude={"view"}))
-        )
+    async def _freshness(self, _request: BaseModel, deadline: float) -> BaseModel:
+        return await self._gateway.get_freshness(deadline_seconds=deadline)
 
-    def _panel(self, request: PanelInput) -> PanelResult:
-        payload = request.model_dump(exclude={"columns", "view"})
-        payload["columns"] = tuple(
-            PanelColumn.model_validate(column.model_dump()) for column in request.columns
-        )
-        return self._data.get_aligned_panel(PanelQuery.model_validate(payload))
+    async def _series(self, request: BaseModel, deadline: float) -> BaseModel:
+        series = cast(SeriesInput, request)
+        query = SeriesQuery.model_validate(series.model_dump(exclude={"view"}))
+        return await self._gateway.get_series(query, deadline_seconds=deadline)
 
-    def _conditional_returns(self, request: ConditionalReturnsInput) -> ConditionalReturnsResult:
-        payload = request.model_dump(exclude={"conditions", "view"})
-        payload["conditions"] = tuple(
-            Condition.model_validate(condition.model_dump()) for condition in request.conditions
-        )
-        return self._data.get_conditional_returns(ConditionalReturnsQuery.model_validate(payload))
+    async def _derived(self, request: BaseModel, deadline: float) -> BaseModel:
+        derived = cast(DerivedInput, request)
+        query = DerivedQuery.model_validate(derived.model_dump(exclude={"view"}))
+        return await self._gateway.get_derived(query, deadline_seconds=deadline)
+
+    async def _lineage(self, request: BaseModel, deadline: float) -> BaseModel:
+        event_id = str(cast(LineageInput, request).event_id)
+        return await self._gateway.get_lineage(event_id, deadline_seconds=deadline)
+
+    async def _panel(self, request: BaseModel, deadline: float) -> BaseModel:
+        query = _panel_query(cast(PanelInput, request))
+        return await self._gateway.get_aligned_panel(query, deadline_seconds=deadline)
+
+    async def _conditional_returns(self, request: BaseModel, deadline: float) -> BaseModel:
+        query = _conditional_query(cast(ConditionalReturnsInput, request))
+        return await self._gateway.get_conditional_returns(query, deadline_seconds=deadline)
+
+
+def _panel_query(request: PanelInput) -> PanelQuery:
+    payload = request.model_dump(exclude={"columns", "view"})
+    payload["columns"] = tuple(
+        PanelColumn.model_validate(column.model_dump()) for column in request.columns
+    )
+    return PanelQuery.model_validate(payload)
+
+
+def _conditional_query(request: ConditionalReturnsInput) -> ConditionalReturnsQuery:
+    payload = request.model_dump(exclude={"conditions", "view"})
+    payload["conditions"] = tuple(
+        Condition.model_validate(condition.model_dump()) for condition in request.conditions
+    )
+    return ConditionalReturnsQuery.model_validate(payload)
 
 
 def _clean(data: BaseModel, request: BaseModel) -> BaseModel:
@@ -174,7 +202,7 @@ def _clean(data: BaseModel, request: BaseModel) -> BaseModel:
         return clean_panel(data)
     if isinstance(data, ConditionalReturnsResult):
         return clean_conditional_returns(data)
-    raise ToolInputError from None
+    raise ToolInputError("This tool has no clean view; use view='raw'.") from None
 
 
 def _warnings(data: BaseModel) -> tuple[str, ...]:

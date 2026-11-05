@@ -6,6 +6,7 @@ retryable, and whether a client may retry is part of every error reply.
 
 from __future__ import annotations
 
+from stram_quant_mcp.errors import ToolForbiddenError
 from stram_quant_mcp.tool_registry import TOOL_SPECS
 from tests.parity.harness import ALL_SCOPES, ParityClient
 
@@ -21,8 +22,8 @@ def test_a_denied_call_says_access_denied_and_is_not_retryable(
     result = parity.call_tool("quant_get_series", {}, token).result
 
     assert result["isError"] is True
-    assert result["content"][0]["text"] == ACCESS_DENIED_TEXT
-    assert result["_meta"][ERROR_META_KEY] == {"code": "access_denied", "retryable": False}
+    assert result["content"][0]["text"].startswith(ACCESS_DENIED_TEXT)
+    assert result["_meta"][ERROR_META_KEY] == ToolForbiddenError().public_details()
 
 
 def test_a_tool_the_caller_cannot_use_is_hidden_from_the_list(
@@ -45,7 +46,7 @@ def test_hiding_a_tool_does_not_change_the_error_for_calling_it(
     hidden = parity.call_tool("quant_get_series", {}, narrow).result
     unknown = parity.call_tool("quant_no_such_tool", {}, full).result
 
-    assert hidden["content"][0]["text"] == ACCESS_DENIED_TEXT
+    assert hidden["content"][0]["text"].startswith(ACCESS_DENIED_TEXT)
     assert unknown["content"][0]["text"] != hidden["content"][0]["text"]
 
 

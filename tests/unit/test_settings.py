@@ -10,7 +10,10 @@ from stram_quant_mcp.settings import AppSettings, is_loopback_url, load_secret_f
 
 def _values(tmp_path: Path) -> dict[str, object]:
     return {
-        "parquet_root": tmp_path,
+        "data_url": "https://data.example:8444",
+        "data_token_url": "https://issuer.example/token",
+        "data_client_id": "stram-quant-mcp",
+        "data_client_secret_path": tmp_path / "data.secret",
         "audit_db_path": tmp_path / "audit.db",
         "audit_key_path": tmp_path / "audit.key",
         "issuer_url": "https://issuer.example",
@@ -37,6 +40,9 @@ def _values(tmp_path: Path) -> dict[str, object]:
             "loopback",
         ),
         ({"otlp_endpoint": "http://collector.example"}, "OTLP"),
+        ({"data_url": "http://data.example"}, "HTTPS"),
+        ({"data_token_url": "http://issuer.example/token"}, "HTTPS"),
+        ({"data_client_id": "bad id!"}, "data_client_id"),
     ],
 )
 def test_security_configuration_rejects_ambiguous_values(
@@ -54,7 +60,10 @@ def test_environment_is_parsed_once_and_missing_values_fail(monkeypatch, tmp_pat
         AppSettings.from_env()
 
     environment = {
-        "STRAM_MCP_PARQUET_ROOT": str(tmp_path),
+        "STRAM_MCP_DATA_URL": "http://testserver",
+        "STRAM_MCP_DATA_TOKEN_URL": "http://testserver/token",
+        "STRAM_MCP_DATA_CLIENT_ID": "stram-quant-mcp",
+        "STRAM_MCP_DATA_CLIENT_SECRET_FILE": str(tmp_path / "data.secret"),
         "STRAM_MCP_AUDIT_DB": str(tmp_path / "audit.db"),
         "STRAM_MCP_AUDIT_KEY_FILE": str(tmp_path / "audit.key"),
         "STRAM_MCP_ISSUER_URL": "http://testserver/issuer",
@@ -66,9 +75,10 @@ def test_environment_is_parsed_once_and_missing_values_fail(monkeypatch, tmp_pat
         "STRAM_MCP_ALLOW_INSECURE_HTTP": "1",
         "STRAM_MCP_IMAGE_DIGEST": "sha256:test",
         "STRAM_MCP_OTLP_ENDPOINT": "http://localhost:4318",
-        "STRAM_MCP_WORKER_MAX_RESTARTS": "4",
-        "STRAM_MCP_WORKER_RESTART_BACKOFF_SECONDS": "0.5",
-        "STRAM_MCP_WORKER_SHUTDOWN_SECONDS": "6",
+        "STRAM_MCP_DATA_MAX_CONCURRENT": "6",
+        "STRAM_MCP_DATA_BREAKER_THRESHOLD": "3",
+        "STRAM_MCP_DATA_BREAKER_COOLDOWN_SECONDS": "0.5",
+        "STRAM_MCP_BACKEND_SHUTDOWN_SECONDS": "6",
     }
     for key, value in environment.items():
         monkeypatch.setenv(key, value)
@@ -76,9 +86,11 @@ def test_environment_is_parsed_once_and_missing_values_fail(monkeypatch, tmp_pat
     assert settings.allowed_hosts == ("testserver", "localhost")
     assert settings.image_digest == "sha256:test"
     assert str(settings.otlp_endpoint) == "http://localhost:4318"
-    assert settings.worker_max_restarts == 4
-    assert settings.worker_restart_backoff_seconds == 0.5
-    assert settings.worker_shutdown_seconds == 6
+    assert settings.data_max_concurrent == 6
+    assert settings.data_breaker_threshold == 3
+    assert settings.data_breaker_cooldown_seconds == 0.5
+    assert settings.backend_shutdown_seconds == 6
+    assert str(settings.data_url) == "http://testserver"
 
 
 def test_secret_file_and_loopback_helpers(tmp_path) -> None:

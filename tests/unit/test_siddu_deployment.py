@@ -25,6 +25,7 @@ from stram_quant_mcp.audit import AuditJournal
 from stram_quant_mcp.fastmcp_auth import StrictVerifier
 from stram_quant_mcp.fastmcp_server import create_fastmcp_application
 from stram_quant_mcp.settings import AppSettings
+from tests.support.fake_data_plane import DATA_URL, TOKEN_URL, FakeDataPlane
 from tools import keycloak_negative_tokens, staging_acceptance
 
 ROOT = Path(__file__).parents[2]
@@ -251,6 +252,8 @@ async def test_staging_acceptance_verifier_passes_end_to_end_over_https(tmp_path
         ]
     )
 
+    data_secret = tmp_path / "data.secret"
+    data_secret.write_text("test-client-secret")
     audit_db = tmp_path / "audit.sqlite3"
     audit_key_file = tmp_path / "audit.key"
     audit_key = b"k" * 32
@@ -258,7 +261,10 @@ async def test_staging_acceptance_verifier_passes_end_to_end_over_https(tmp_path
     audit_key_file.chmod(0o600)
 
     settings = AppSettings(
-        parquet_root=ROOT / "tests/fixtures/lake",
+        data_url=DATA_URL,
+        data_token_url=TOKEN_URL,
+        data_client_id="stram-quant-mcp",
+        data_client_secret_path=data_secret,
         audit_db_path=audit_db,
         audit_key_path=audit_key_file,
         issuer_url=AnyHttpUrl(issuer),
@@ -270,7 +276,10 @@ async def test_staging_acceptance_verifier_passes_end_to_end_over_https(tmp_path
         image_digest="sha256:" + "a" * 64,
     )
     served_app = create_fastmcp_application(
-        settings, token_verifier=_strict_verifier(settings, private_key), audit_key=audit_key
+        settings,
+        token_verifier=_strict_verifier(settings, private_key),
+        audit_key=audit_key,
+        data_transport=FakeDataPlane(),
     ).app
 
     idp_server = uvicorn.Server(

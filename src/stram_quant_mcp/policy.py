@@ -18,10 +18,12 @@ from stram_quant_mcp.errors import (
     ToolInputError,
     ToolOverloadedError,
     ToolUnavailableError,
+    ToolUpstreamError,
 )
+from stram_quant_mcp.http_backend import DataBackend
+from stram_quant_mcp.input_validation import describe_validation_error
 from stram_quant_mcp.settings import AppSettings
 from stram_quant_mcp.tool_registry import TOOLS_BY_NAME
-from stram_quant_mcp.worker import QueryWorker
 
 
 class RateLimiter:
@@ -65,19 +67,19 @@ class RateLimiter:
 
 
 class InvocationService:
-    """Authorize and audit every terminal tool invocation around the query worker."""
+    """Authorize and audit every terminal tool invocation around the Data Plane backend."""
 
     def __init__(
         self,
         settings: AppSettings,
-        worker: QueryWorker,
+        backend: DataBackend,
         audit: AuditJournal,
         rate_limiter: RateLimiter,
         *,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._settings = settings
-        self._worker = worker
+        self._backend = backend
         self._audit = audit
         self._rate_limiter = rate_limiter
         self._clock = clock
@@ -111,7 +113,7 @@ class InvocationService:
             "required_scope": spec.scope if spec else None,
             "data_scope": _data_scope(arguments),
             "availability_mode": _string_value(arguments.get("availability")),
-            "policy_version": self._worker.policy_version,
+            "policy_version": self._backend.policy_version,
             "image_digest": self._settings.image_digest,
         }
         if spec is None:
@@ -129,7 +131,7 @@ class InvocationService:
             self._append(base, started, "allowed", "rate_limited", "ToolOverloadedError")
             raise ToolOverloadedError from None
         try:
-            payload = await self._worker.call(
+            payload = await self._backend.call(
                 tool_name,
                 arguments,
                 request_id,
@@ -137,8 +139,11 @@ class InvocationService:
             )
             validated = spec.output_model.model_validate(payload).model_dump(mode="json")
         except ValidationError as error:
-            self._append(base, started, "allowed", "invalid_worker_output", "ValidationError")
-            raise ToolUnavailableError from error
+            self._append(base, started, "allowed", "invalid_backend_output", "ValidationError")
+            raise ToolUpstreamError(
+                "The service's own result failed its declared output schema "
+                f"({describe_validation_error(error)})."
+            ) from None
         except asyncio.CancelledError:
             self._append(base, started, "allowed", "cancelled", "CancelledError")
             raise

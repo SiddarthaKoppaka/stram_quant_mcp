@@ -80,20 +80,12 @@ def test_entrypoint_routes_commands(monkeypatch) -> None:
     assert result.value.code == 0
     monkeypatch.setattr(
         entrypoint,
-        "verify_native_network_isolation",
-        lambda: called.append("worker-network-probe"),
+        "data_plane_probe",
+        lambda: _record_async(called, "data-plane-probe"),
     )
-    monkeypatch.setattr("sys.argv", ["entrypoint", "worker-network-probe"])
+    monkeypatch.setattr("sys.argv", ["entrypoint", "data-plane-probe"])
     entrypoint.main()
-    assert called == ["worker-network-probe"]
-    monkeypatch.setattr(
-        entrypoint,
-        "worker_interface_probe",
-        lambda: _record_async(called, "worker-interface-probe"),
-    )
-    monkeypatch.setattr("sys.argv", ["entrypoint", "worker-interface-probe"])
-    entrypoint.main()
-    assert called == ["worker-network-probe", "worker-interface-probe"]
+    assert called == ["data-plane-probe"]
     monkeypatch.setattr("sys.argv", ["entrypoint", "unknown"])
     with pytest.raises(SystemExit, match="usage"):
         entrypoint.main()

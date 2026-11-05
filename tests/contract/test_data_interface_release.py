@@ -10,11 +10,11 @@ import stram_data
 import stram_data.data_interface as public
 
 ROOT = Path(__file__).parents[2]
-SNAPSHOT = json.loads((ROOT / "contracts/data_interface.v1.3.1.json").read_text())
+SNAPSHOT = json.loads((ROOT / "contracts/data_interface.v1.9.0.json").read_text())
 
 
 def test_exact_data_interface_release_is_installed() -> None:
-    assert stram_data.__version__ == SNAPSHOT["package_version"] == "1.3.1"
+    assert stram_data.__version__ == SNAPSHOT["package_version"] == "1.9.0"
     assert public.INTERFACE_VERSION == SNAPSHOT["interface_version"] == "1"
 
 

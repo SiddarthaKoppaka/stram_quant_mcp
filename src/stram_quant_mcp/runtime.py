@@ -5,18 +5,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from stram_quant_mcp.audit import AuditJournal
+from stram_quant_mcp.http_backend import DataBackend
 from stram_quant_mcp.policy import InvocationService
 from stram_quant_mcp.settings import AppSettings
 from stram_quant_mcp.telemetry import Telemetry
-from stram_quant_mcp.worker import QueryWorker
 
 
 @dataclass(slots=True)
 class Runtime:
-    """The worker, audit journal, invocation service and telemetry of one running service."""
+    """The backend, audit journal, invocation service and telemetry of one running service."""
 
     settings: AppSettings
-    worker: QueryWorker
+    backend: DataBackend
     audit: AuditJournal
     invocations: InvocationService
     telemetry: Telemetry
@@ -25,4 +25,4 @@ class Runtime:
     @property
     def ready(self) -> bool:
         """Whether the service is accepting calls and every dependency is healthy."""
-        return self.accepting and self.worker.ready and self.audit.healthy
+        return self.accepting and self.backend.ready and self.audit.healthy

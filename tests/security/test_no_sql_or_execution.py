@@ -9,6 +9,11 @@ FORBIDDEN_CALLS = {"eval", "exec", "compile", "system", "popen"}
 FORBIDDEN_IMPORTS = {"duckdb", "subprocess"}
 
 
+def _is_regex_compile(func: ast.Attribute) -> bool:
+    """``re.compile`` builds a pattern; it never executes code."""
+    return func.attr == "compile" and isinstance(func.value, ast.Name) and func.value.id == "re"
+
+
 def test_tool_plane_contains_no_sql_or_arbitrary_execution() -> None:
     violations: list[str] = []
     for path in SOURCE.rglob("*.py"):
@@ -30,7 +35,11 @@ def test_tool_plane_contains_no_sql_or_arbitrary_execution() -> None:
             if isinstance(node, ast.Call):
                 if isinstance(node.func, ast.Name) and node.func.id in FORBIDDEN_CALLS:
                     violations.append(f"{path.relative_to(ROOT)}:{node.lineno} forbidden call")
-                if isinstance(node.func, ast.Attribute) and node.func.attr in FORBIDDEN_CALLS:
+                if (
+                    isinstance(node.func, ast.Attribute)
+                    and node.func.attr in FORBIDDEN_CALLS
+                    and not _is_regex_compile(node.func)
+                ):
                     violations.append(f"{path.relative_to(ROOT)}:{node.lineno} forbidden call")
     assert violations == []
 

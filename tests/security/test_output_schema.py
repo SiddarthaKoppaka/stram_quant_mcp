@@ -5,9 +5,9 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from stram_quant_mcp.tool_adapter import QuantToolAdapter
 from stram_quant_mcp.tool_models import DerivedEnvelope, SeriesEnvelope
 from stram_quant_mcp.tool_registry import TOOL_SPECS, exported_definitions
+from tests.support.sync_adapter import SyncAdapter
 
 ROOT = Path(__file__).parents[2]
 
@@ -27,7 +27,7 @@ def test_checked_in_tool_definitions_are_current_and_closed() -> None:
 
 
 def test_every_real_result_round_trips_through_its_output_contract(
-    tool_adapter: QuantToolAdapter,
+    tool_adapter: SyncAdapter,
 ) -> None:
     examples: dict[str, dict[str, object]] = {
         "quant_list_series": {"limit": 2},

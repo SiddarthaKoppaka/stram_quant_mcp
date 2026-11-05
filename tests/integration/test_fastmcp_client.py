@@ -14,8 +14,9 @@ from mcp.client.streamable_http import streamable_http_client
 
 from stram_quant_mcp.fastmcp_auth import StrictVerifier
 from stram_quant_mcp.fastmcp_server import create_fastmcp_application
-from stram_quant_mcp.settings import AppSettings
-from tests.parity.harness import LAKE, TENANT, TokenMinter
+from tests.parity.harness import TENANT, TokenMinter
+from tests.support.fake_data_plane import FakeDataPlane
+from tests.support.settings import make_settings
 
 ISSUER = "http://127.0.0.1/issuer"
 SERVER_START_ATTEMPTS = 100
@@ -33,20 +34,22 @@ def _free_port() -> int:
 async def test_official_client_lists_and_calls_tools_on_the_fastmcp_server(tmp_path: Path) -> None:
     port = _free_port()
     endpoint = f"http://127.0.0.1:{port}/mcp"
-    settings = AppSettings(
-        parquet_root=LAKE.resolve(),
-        audit_db_path=tmp_path / "audit.sqlite3",
-        audit_key_path=tmp_path / "audit.key",
+    settings = make_settings(
+        tmp_path,
         issuer_url=ISSUER,
         resource_url=endpoint,
         jwks_url="http://127.0.0.1/jwks",
         tenant_id=TENANT,
         allowed_hosts=(f"127.0.0.1:{port}",),
-        allow_insecure_http=True,
     )
     minter = TokenMinter()
     verifier = StrictVerifier(settings, public_key=minter.public_key_pem())
-    built = create_fastmcp_application(settings, token_verifier=verifier, audit_key=b"k" * 32)
+    built = create_fastmcp_application(
+        settings,
+        token_verifier=verifier,
+        audit_key=b"k" * 32,
+        data_transport=FakeDataPlane(),
+    )
     token = minter.mint(
         ALL_SCOPES, overrides={"iss": ISSUER, "aud": endpoint, "client_id": "quant-client"}
     )

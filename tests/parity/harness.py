@@ -24,6 +24,7 @@ from stram_quant_mcp.fastmcp_auth import StrictVerifier
 from stram_quant_mcp.fastmcp_server import create_fastmcp_application
 from stram_quant_mcp.settings import AppSettings
 from stram_quant_mcp.tool_registry import TOOL_SPECS
+from tests.support.fake_data_plane import DATA_URL, TOKEN_URL, FakeDataPlane
 
 ISSUER = "https://idp.test/realms/stram"
 RESOURCE = "https://mcp.test/mcp"
@@ -33,14 +34,23 @@ TENANT = "local-stram"
 ALL_SCOPES = tuple(sorted({spec.scope for spec in TOOL_SPECS}))
 TOKEN_LIFETIME_SECONDS = 300
 ACCEPT = "application/json, text/event-stream"
-LAKE = Path(__file__).parents[1] / "fixtures/lake"
 
 
-def build_service(settings: AppSettings, minter: TokenMinter, audit_key: bytes) -> ASGIApp:
+def build_service(
+    settings: AppSettings,
+    minter: TokenMinter,
+    audit_key: bytes,
+    data_plane: FakeDataPlane | None = None,
+) -> ASGIApp:
     """Build the service, trusting only the minter's key."""
 
     verifier = StrictVerifier(settings, public_key=minter.public_key_pem())
-    built = create_fastmcp_application(settings, token_verifier=verifier, audit_key=audit_key)
+    built = create_fastmcp_application(
+        settings,
+        token_verifier=verifier,
+        audit_key=audit_key,
+        data_transport=data_plane or FakeDataPlane(),
+    )
     return built.app
 
 
@@ -170,7 +180,10 @@ def parity_settings(tmp_path: Path) -> AppSettings:
     """Return loopback-safe settings that match the documented production shape."""
 
     return AppSettings(
-        parquet_root=LAKE.resolve(),
+        data_url=DATA_URL,
+        data_token_url=TOKEN_URL,
+        data_client_id="stram-quant-mcp-test",
+        data_client_secret_path=_secret_file(tmp_path),
         audit_db_path=tmp_path / "audit.sqlite3",
         audit_key_path=tmp_path / "audit.key",
         issuer_url=ISSUER,
@@ -181,3 +194,11 @@ def parity_settings(tmp_path: Path) -> AppSettings:
         allowed_origins=(ALLOWED_ORIGIN,),
         image_digest="sha256:parity",
     )
+
+
+def _secret_file(directory: Path) -> Path:
+    """Write the throwaway Data Plane client secret the settings point at."""
+
+    path = directory / "data-client.secret"
+    path.write_text("test-client-secret")
+    return path

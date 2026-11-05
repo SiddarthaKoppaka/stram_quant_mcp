@@ -19,6 +19,7 @@ from stram_quant_mcp.telemetry import (
     configure_telemetry,
     correlation_ids,
 )
+from tests.support.fake_data_plane import TOKEN_URL
 
 
 class MemorySpanExporter(SpanExporter):
@@ -103,7 +104,10 @@ def test_w3c_traceparent_is_preserved_as_parent_context() -> None:
 @pytest.mark.asyncio
 async def test_production_telemetry_configuration_without_exporter(tmp_path: Path, capsys) -> None:
     settings = AppSettings(
-        parquet_root=tmp_path,
+        data_url="https://data.example",
+        data_token_url=TOKEN_URL,
+        data_client_id="stram-quant-mcp",
+        data_client_secret_path=tmp_path / "data.secret",
         audit_db_path=tmp_path / "audit.db",
         audit_key_path=tmp_path / "audit.key",
         issuer_url="https://issuer.example",
