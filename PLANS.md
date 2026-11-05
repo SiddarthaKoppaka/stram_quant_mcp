@@ -219,6 +219,48 @@ the operator performs that single terminal authentication; the three new service
 - Behavior changes to communicate to clients: the denial message is now `Access denied.`; `tools/list` shows only
   callable tools; repeated denials block the caller.
 
+### M8 Data Plane HTTP gateway (2026-11-05, branch `feat/http-data-gateway`, not committed)
+
+Scope: replace the in-process `DataInterface` plus spawned seccomp worker with authenticated HTTP calls
+to the Data Plane service (`stram-data` 1.9.0, Data Interface v1), and make every failure state why it
+failed and whether retrying can help. Authorized by the user on 2026-11-05 for local implementation
+only. No deployment, credential access, push or commit took place.
+
+Decisions:
+- Identity is "Option A": this service holds its own `client_credentials` token; the Data Plane sees
+  this service, and per-user scope, tenant and audit stay here. Option B (end-user token exchange) is
+  deferred to the STRAM API team.
+- `QuantToolAdapter` is now async over a typed `DataGateway`; `HttpDataBackend` replaces `QueryWorker`
+  with bounded slots, per-tool deadlines and a circuit breaker. The seccomp worker was removed because
+  no query or lake access remains in this process; the container's egress allowlist replaces it.
+- Errors carry `code`, `category`, `retryable`, `reason`, `next_action` and optional
+  `retry_after_seconds` / `upstream_request_id`. Separate categories exist for caller errors, access
+  denial, this service's own credentials, Data Plane outage, Data Plane fault, deadline, capacity and
+  resource limit. The only automatic retries are one token refresh, one reconnect and honouring
+  `Retry-After`.
+- Pydantic validates inputs (reasons name the field, never the value), parses every Data Plane reply
+  into the reviewed result model, and validates the full envelope against the declared output schema.
+- Tool descriptions are rendered from one table (`tool_docs.py`) and list each tool's failures.
+
+Evidence (local): full suite passes except `test_siddu_installer_is_valid_and_keeps_activation_gates`,
+which also fails on the unchanged baseline because macOS has no `/usr/bin/bash`; coverage 93.9%;
+`mypy`, `ruff check`, `ruff format --check`, `lint-imports`, `export_schema --check` and
+`tools/check_docs.py` pass. Tests run the real `stram_data` service app in-process over the synthetic
+lake. The live staging service answered `/healthz` and `/v1/openapi.json` (1.9.0) unauthenticated.
+
+Remaining risks and follow-ups:
+- Not yet exercised against the live staging service: that needs the Keycloak client secret through the
+  agreed secret channel.
+- `stram-data` is still installed for its typed models, which drags in DuckDB, PyArrow and psycopg
+  (PyArrow exception PYSEC-2026-113 stays open). Removing it needs models generated from the OpenAPI
+  document or an upstream models-only package.
+- `deploy/stram_quant_siddu.sh`, the Quadlet units and `docs/STRAM_HQ_HANDOFF.md` still describe the
+  lake mount and worker probes; they need an authorized update before any redeploy, and egress policy
+  must allow only the token endpoint, the Data Plane and the collector.
+- Image build: see the verification note in the handoff message; the first attempt failed on a Debian
+  snapshot mirror outage.
+- Market-data tools wait for real-time ingestion; end-user identity waits for Option B.
+
 ### Clean view (2026-11-04, PR #1)
 
 - Decision: add an optional `view` (`raw` default, `clean`) to the five tools whose rows repeat shared fields:

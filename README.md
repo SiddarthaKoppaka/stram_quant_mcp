@@ -1,9 +1,9 @@
 # Stram Quant MCP
 
 Stram Quant MCP is the independently deployed, read-only MCP Tool Plane for Stram quantitative
-data. Ten typed tools expose the pinned `stram_data.data_interface` 1.3.1 API over authenticated
-Streamable HTTP. This repository owns transport, identity, authorization, bounds, worker isolation,
-audit and telemetry. It does not own SQL, financial calculations, ingestion, lake schemas or AI
+data. Ten typed tools expose the Stram Data Plane service (Data Interface v1, service 1.9 or later)
+over authenticated Streamable HTTP. This repository owns transport, identity, authorization, bounds,
+failure classification, audit and telemetry. It does not own SQL, financial calculations, ingestion, lake schemas or AI
 orchestration.
 
 Status on 2026-11-03: the server runs on FastMCP (milestone M7); the previous server is kept on the
@@ -19,32 +19,33 @@ flowchart LR
     T --> A[JWT authentication]
     A --> P[tenant, scope, rate and bounds]
     P --> J[(HMAC-chained audit)]
-    P --> W[isolated query worker]
-    W --> I[stram_data.data_interface 1.3.1]
-    I --> D[DuckDB over read-only Parquet]
-    W -. no token, socket APIs blocked .-> I
+    P --> B[bounded Data Plane backend]
+    B -->|service token, HTTPS| S[Data Plane service 1.9+]
+    S --> D[DuckDB over read-only Parquet]
 ```
 
-Every call is authenticated and authorized before worker dispatch. The worker receives only a tool
-name, validated arguments and a request ID. It imports only the public Data Interface. Terminal
+Every call is authenticated and authorized before the Data Plane is contacted. The backend sends only
+validated arguments, using this service's own short-lived token; no end-user token or claim leaves
+the container. This service has no lake mount or query engine. Every failure says why it failed and
+whether retrying can help. Terminal
 success, denial and failure outcomes are appended to the audit chain; an audit append failure fails
 the call closed. See [Architecture](docs/explanation/architecture.md) for the complete lifecycle and boundaries.
 
 ## Quick start
 
 Supported toolchain: CPython 3.12 through 3.14 and `uv`. The lock pins the exact `stram-data` source
-commit for release 1.3.1. Private repository access is needed only when the dependency is not already
+commit for release 1.9.0, used for its typed models only. Private repository access is needed only when the dependency is not already
 available in the local cache.
 
 ```bash
 uv sync --frozen --dev
-uv run python -c 'import stram_data; assert stram_data.__version__ == "1.3.1"'
+uv run python -c 'import stram_data; assert stram_data.__version__ == "1.9.0"'
 uv run pytest tests/integration/test_mcp_client.py -q
 ```
 
 The integration test starts the real server on loopback, signs a short-lived JWT, connects with the
-official MCP SDK client, discovers all ten tools and calls the real Data Interface against
-`tests/fixtures/lake`. It does not use production credentials or mocked quantitative responses.
+official MCP SDK client, discovers all ten tools and calls the real Data Plane HTTP service, run in-process
+over `tests/fixtures/lake`. It does not use production credentials or mocked quantitative responses.
 
 Run the complete local gate:
 
