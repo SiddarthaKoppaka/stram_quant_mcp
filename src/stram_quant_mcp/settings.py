@@ -88,7 +88,7 @@ class AppSettings(BaseModel):
             "data_url": "STRAM_MCP_DATA_URL",
             "data_token_url": "STRAM_MCP_DATA_TOKEN_URL",
             "data_client_id": "STRAM_MCP_DATA_CLIENT_ID",
-            "data_client_secret_path": "STRAM_MCP_DATA_CLIENT_SECRET_FILE",
+            "data_client_secret_path": "STRAM_MCP_DATA_CLIENT_SECRET_FILE",  # pragma: allowlist secret
             "audit_db_path": "STRAM_MCP_AUDIT_DB",
             "audit_key_path": "STRAM_MCP_AUDIT_KEY_FILE",
             "issuer_url": "STRAM_MCP_ISSUER_URL",
