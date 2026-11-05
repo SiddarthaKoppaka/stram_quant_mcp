@@ -219,6 +219,26 @@ the operator performs that single terminal authentication; the three new service
 - Behavior changes to communicate to clients: the denial message is now `Access denied.`; `tools/list` shows only
   callable tools; repeated denials block the caller.
 
+### Clean view (2026-11-04, PR #1)
+
+- Decision: add an optional `view` (`raw` default, `clean`) to the five tools whose rows repeat shared fields:
+  `quant_list_series`, `quant_get_series`, `quant_get_derived`, `quant_get_aligned_panel` and
+  `quant_get_conditional_returns`. Agents read these results directly, and a row of raw series data spends about
+  440 bytes on one value. Raw stays byte-identical; only these five tools' schema hashes change.
+- The clean view is lossless (ENGINEERING.md sections 4 and 6): every raw row can be rebuilt from it, which the golden
+  tests do. Shared fields move into the group; IDs, timestamps, lineage IDs and availability evidence stay on each
+  row; absent and null panel cells stay distinct; decimals lose trailing zeros as text only. Nothing is computed
+  except counts of the returned rows. A first, lossy revision was rejected in review for dropping evidence.
+- Import layers (ENGINEERING.md 3.2): one module is added. The closed clean output models live in `tool_models`
+  beside the raw ones, since both are tool output contracts, so no existing code moves. `clean_views` holds the
+  reshaping functions and sits directly under `tool_adapter`, its only caller, and above `tool_registry`, because
+  it reads the raw result models and `tool_models`. It imports nothing above it, and `lint-imports` enforces the
+  order.
+- Explanations never infer. "Mostly undetermined" means `undetermined_days` is more than half of `evaluated_days`;
+  the Data Interface counts undetermined days within the evaluated window (`stram_data` 1.3.1, `service.py`).
+- Evidence: 254 tests pass, including golden rebuilds for all five tools. On the real lake the clean view is 49% to 64%
+  of raw for series, derived, panel and catalog results.
+
 ## 1. Verified knowledge transfer
 
 ### Source and release baseline

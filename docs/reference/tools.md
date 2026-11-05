@@ -35,6 +35,36 @@ dispatch. Invalid inputs and unknown entities are not retried. Overload, deadlin
 errors are retryable only after the caller applies its own bounded policy. MCP errors contain a safe
 message and `isError=true`; they do not expose paths, SQL, dependency details or stack traces.
 
+## Clean view
+
+`quant_list_series`, `quant_get_series`, `quant_get_derived`, `quant_get_aligned_panel` and
+`quant_get_conditional_returns` accept an optional `view`: `raw` (the default) or `clean`. Other tools
+reject it. Both views come from the same Data Interface call and carry the same envelope and
+warnings; the raw result is exactly as described below.
+
+The clean view is **lossless**: every raw row can be rebuilt from it exactly. Fields that every row of
+a group shares are stated once in the group; every other field stays on its row, including IDs,
+timestamps, lineage IDs and availability evidence. Rows are tuples named by `columns`. The result is
+marked `"view": "clean"` and carries the raw `availability` summary unchanged.
+
+| Tool | Clean shape |
+|---|---|
+| `quant_list_series` | One table of every catalog field plus `frequency_normalized`, counts `by_dataset` and `by_provider` of the returned entries, and `limit_filled` when the result filled the limit, which means more entries may exist |
+| `quant_get_series` | `series` grouped by dataset, kind, provider, series key, indicator and unit; each row keeps `observed_on`, `observed_at`, `value`, `known_since`, `is_vintage`, `ingested_at`, `event_id`, `record_id`, `quality_flags` and `availability` |
+| `quant_get_derived` | `groups` by indicator, version, subject, unit and formula; each row keeps `observation_date`, `value`, `known_since`, `computed_at`, `event_id`, `input_event_ids`, `input_batch_ids`, `availability_basis`, `licensed_input`, `retracted` and `availability` |
+| `quant_get_aligned_panel` | A value table (`observed_on` plus one column per series) and `cells`, which lists every present cell with its value, observation date, `known_since`, `filled`, `stale_days` and `availability`. A cell absent from `cells` was absent in the raw panel; a listed cell with a null value was present with no value |
+| `quant_get_conditional_returns` | `horizons` with each outcome's six statistics beside the baseline's, and `events` as rows of `event_columns`, whose `conditions` are rows of `condition_columns` |
+
+Only two things change form. Exact decimals drop trailing zeros as text, never by rounding
+(`0.460000000000` becomes `0.46`). Frequency spellings such as `D`, `day` and `daily` are also given
+as one word in `frequency_normalized`, beside the original `frequency`. When no rows match, or a
+study has no evaluated days, no events, or mostly undetermined days, `explanation` says why in plain
+words.
+
+```json
+{"series_keys":["SPY"],"kinds":["market_bar"],"start_date":"2026-10-01","end_date":"2026-10-31","view":"clean"}
+```
+
 ## Discovery tools
 
 ### `quant_list_series`

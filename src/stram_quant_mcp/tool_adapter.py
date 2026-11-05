@@ -27,6 +27,13 @@ from stram_data.data_interface import (
     SeriesResult,
 )
 
+from stram_quant_mcp.clean_views import (
+    clean_catalog,
+    clean_conditional_returns,
+    clean_derived,
+    clean_panel,
+    clean_series,
+)
 from stram_quant_mcp.errors import ToolInputError, ToolNotFoundError, ToolUnavailableError
 from stram_quant_mcp.tool_models import (
     AvailabilityPoliciesData,
@@ -66,7 +73,12 @@ class QuantToolAdapter:
             raise ToolInputError from None
         try:
             request = spec.input_model.model_validate(arguments)
+            # The view selects the response shape only; the Data Interface never sees it.
             data = self._dispatch(tool_name, request)
+            # Warnings come from the raw result, so both views carry the same ones.
+            warnings = _warnings(data)
+            if getattr(request, "view", "raw") == "clean":
+                data = _clean(data, request)
             envelope = spec.output_model.model_validate(
                 {
                     "tool_version": __version__,
@@ -75,7 +87,7 @@ class QuantToolAdapter:
                     "policy_version": self._policy_version,
                     "request_id": request_id,
                     "data": data,
-                    "warnings": _warnings(data),
+                    "warnings": warnings,
                 }
             )
         except (ValidationError, InvalidQueryError) as error:
@@ -126,24 +138,43 @@ class QuantToolAdapter:
         )
 
     def _series(self, request: SeriesInput) -> SeriesResult:
-        return self._data.get_series(SeriesQuery.model_validate(request.model_dump()))
+        return self._data.get_series(
+            SeriesQuery.model_validate(request.model_dump(exclude={"view"}))
+        )
 
     def _derived(self, request: DerivedInput) -> DerivedResult:
-        return self._data.get_derived(DerivedQuery.model_validate(request.model_dump()))
+        return self._data.get_derived(
+            DerivedQuery.model_validate(request.model_dump(exclude={"view"}))
+        )
 
     def _panel(self, request: PanelInput) -> PanelResult:
-        payload = request.model_dump(exclude={"columns"})
+        payload = request.model_dump(exclude={"columns", "view"})
         payload["columns"] = tuple(
             PanelColumn.model_validate(column.model_dump()) for column in request.columns
         )
         return self._data.get_aligned_panel(PanelQuery.model_validate(payload))
 
     def _conditional_returns(self, request: ConditionalReturnsInput) -> ConditionalReturnsResult:
-        payload = request.model_dump(exclude={"conditions"})
+        payload = request.model_dump(exclude={"conditions", "view"})
         payload["conditions"] = tuple(
             Condition.model_validate(condition.model_dump()) for condition in request.conditions
         )
         return self._data.get_conditional_returns(ConditionalReturnsQuery.model_validate(payload))
+
+
+def _clean(data: BaseModel, request: BaseModel) -> BaseModel:
+    """Reshape a raw result into its clean view; values are copied, never computed."""
+    if isinstance(data, CatalogData):
+        return clean_catalog(data, cast(CatalogInput, request).limit)
+    if isinstance(data, SeriesResult):
+        return clean_series(data)
+    if isinstance(data, DerivedResult):
+        return clean_derived(data)
+    if isinstance(data, PanelResult):
+        return clean_panel(data)
+    if isinstance(data, ConditionalReturnsResult):
+        return clean_conditional_returns(data)
+    raise ToolInputError from None
 
 
 def _warnings(data: BaseModel) -> tuple[str, ...]:
