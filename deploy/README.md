@@ -10,8 +10,9 @@ opens a public listener, alters the real lake, or enables a GitHub runner.
 
 The target has two security identities:
 
-- `stram-quant` owns only the Quant rootless Podman store, read-only lake view, audit volume and HMAC
-  secret. Its MCP listener is `127.0.0.1:8800`.
+- `stram-quant` owns only the Quant rootless Podman store, audit volume, HMAC secret and the Data Plane
+  client secret. It has no lake mount: it reads quantitative data only through the Data Plane HTTP
+  service. Its MCP listener is `127.0.0.1:8800`.
 - `stram-auth` owns an independent rootless Podman store, internal network, PostgreSQL volume and
   Keycloak secrets. It receives no lake, audit volume or audit key. Keycloak HTTP and management ports
   publish only on loopback for the approved private TLS proxy.
@@ -33,7 +34,7 @@ The second form can inspect protected service-user state but does not mutate it.
 specific check ran; `NOT VERIFIED` and `BLOCKED` must remain open until evidence exists.
 
 Provision the independently isolated auth identity, import the reviewed image archives into the two
-rootless stores, then reuse and re-check the existing lake, audit volume and audit key:
+rootless stores, then reuse and re-check the existing audit volume, audit key and Data Plane client secret:
 
 ```bash
 sudo bash deploy/stram_quant_siddu.sh provision-auth
@@ -41,8 +42,8 @@ sudo bash deploy/stram_quant_siddu.sh import-images
 sudo bash deploy/stram_quant_siddu.sh prepare
 ```
 
-`prepare` repeats the non-destructive real-lake and worker probes and creates missing configuration
-templates only. It never regenerates an existing audit HMAC key or journal.
+`prepare` repeats the non-destructive isolation, preflight and live Data Plane probes and creates missing
+configuration templates only. It never regenerates an existing audit HMAC key or journal.
 
 `provision-auth` creates the non-login `stram-auth` identity with a non-overlapping 65536-ID subordinate
 UID/GID range and lingering, blocks it from traversing the Quant lake parent, and creates the separate
@@ -105,15 +106,16 @@ sudo bash deploy/stram_quant_siddu.sh status
 
 `verify` checks discovery/JWKS and certificate trust, exact positive claims, missing/bad/wrong/expired
 token denial, Host/Origin denial, insufficient scope, exactly ten tools, representative authenticated
-real-lake calls, worker seccomp and denied DNS/IPv4/IPv6 egress. It prints no token or tool result.
+authenticated calls, a live service-token and Data Plane link check, and denied DNS/IPv4/IPv6 egress. It prints no token or tool result.
 `backup-audit` uses SQLite online backup against the live WAL journal, verifies the copy with the
 matching HMAC key, makes it root-owned/read-only, and records a separate host-keyed checkpoint.
 `verify-backup` independently verifies the checkpoint signature, backup digest and complete audit
 chain. The persistent daily timer applies a documented 30-day private-staging retention window.
-`reliability-drill` pauses the live worker during a genuine authenticated call to prove the hard
-deadline, replacement and recovery path, then performs a controlled bounded service restart.
+`reliability-drill` blocks the MCP user's route to the Data Plane port with a temporary firewall table
+to prove classified, retryable failures, that readiness stays true, and circuit-breaker recovery, always
+removes the table, then performs a controlled bounded service restart.
 
-Rollback is also separately gated and never changes the lake or replaces the live audit journal:
+Rollback is also separately gated and never touches the Data Plane or replaces the live audit journal:
 
 ```bash
 sudoedit /etc/stram-quant/m6-approval.env
@@ -124,7 +126,7 @@ sudo bash deploy/stram_quant_siddu.sh enable-services
 
 The operator must set a retained `ROLLBACK_IMAGE_REF` digest and `ROLLBACK_AUTHORIZED=yes` for the
 specific event. The command first takes a verified audit backup/checkpoint, probes the rollback image
-against the real read-only lake, preserves the current Quadlet, restarts with the previous digest and
+(container isolation, preflight and the live Data Plane link), preserves the current Quadlet, restarts with the previous digest and
 requires readiness. The genuine retained approved artifact is restored and re-verified after the
 drill. `enable-services` refuses to add Quadlet boot persistence until live acceptance, backup,
 checkpoint and rollback/recovery gates are all recorded as verified.

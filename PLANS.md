@@ -254,11 +254,13 @@ Remaining risks and follow-ups:
 - `stram-data` is still installed for its typed models, which drags in DuckDB, PyArrow and psycopg
   (PyArrow exception PYSEC-2026-113 stays open). Removing it needs models generated from the OpenAPI
   document or an upstream models-only package.
-- `deploy/stram_quant_siddu.sh`, the Quadlet units and `docs/STRAM_HQ_HANDOFF.md` still describe the
-  lake mount and worker probes; they need an authorized update before any redeploy, and egress policy
-  must allow only the token endpoint, the Data Plane and the collector.
-- Image build: see the verification note in the handoff message; the first attempt failed on a Debian
-  snapshot mirror outage.
+- Deploy script, Quadlet template and runbook were brought in line with the gateway in the follow-up
+  change (no lake mount, data client secret, Data Plane egress rule, `data-plane-probe`, outage drill);
+  see `docs/how-to/deploy-the-http-gateway.md`. The script is syntax-checked only; its privileged steps
+  have not been run from the repository.
+- Deployed to SIDDU staging by the operator (image from the PR #3 merge, `data-plane-probe` returned
+  `data_plane_ok`). `verify` and the rollback drill are still unconfirmed because `m6-approval.env`
+  names the earlier image; updating it is the operator's approval to give.
 - Market-data tools wait for real-time ingestion; end-user identity waits for Option B.
 
 ### Clean view (2026-11-04, PR #1)

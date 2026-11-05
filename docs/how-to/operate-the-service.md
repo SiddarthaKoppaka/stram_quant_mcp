@@ -106,8 +106,9 @@ and records the administrator-owned ruleset. Do not recreate the verified Quant 
 audit objects or review image merely because this sandbox cannot inspect their protected state.
 
 > **Superseded in part.** This service no longer needs the lake mount described below, which belongs
-> to the Data Plane service. The Quadlet and `deploy/` scripts still describe the former lake mount and
-> are pending an authorized update. See [Architecture](../explanation/architecture.md).
+> to the Data Plane service. The `deploy/` script and Quadlet template now match the HTTP gateway
+> design. To move an existing staging host over, follow
+> [Deploy the HTTP gateway build](deploy-the-http-gateway.md).
 
 ### Required identity and mount design
 

@@ -23,6 +23,7 @@ so you can find what you need by asking what you are trying to do.
 - [Provision the Qual MCP Keycloak clients](how-to/provision-qual-clients.md)
 - [Apply the OAuth discovery routes](how-to/apply-discovery-routes.md)
 - [Operate the service](how-to/operate-the-service.md): the full runbook for staging, recovery and rollback.
+- [Deploy the HTTP gateway build](how-to/deploy-the-http-gateway.md): move SIDDU from the lake-mounted build to the Data Plane gateway, step by step.
 
 ## Reference
 

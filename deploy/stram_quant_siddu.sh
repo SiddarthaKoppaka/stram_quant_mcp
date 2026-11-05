@@ -11,6 +11,10 @@ AUTH_HOME=/home/stram-auth
 LAKE=/srv/stram-quant/lake
 AUDIT_VOLUME=stram-quant-mcp-audit
 AUDIT_SECRET=stram-quant-audit-key
+DATA_SECRET=stram-quant-data-client-secret
+DATA_SERVICE_PORT=${STRAM_QUANT_DATA_PORT:-8444}
+DATA_CLIENT_ID=${STRAM_QUANT_DATA_CLIENT_ID:-stram-data-mcp-staging}
+DATA_SECRET_TARGET=data-client-secret
 REVIEW_IMAGE=localhost/stram-quant-mcp:review
 QUANT_NETWORK=stram-quant-private
 AUTH_NETWORK=stram-auth-private
@@ -174,60 +178,58 @@ PY
   PRIVATE_CA_FILE=${AUTH_VALUES[15]}
   MCP_ISSUER_URL="$KEYCLOAK_PUBLIC_URL/realms/$KEYCLOAK_REALM"
   MCP_JWKS_URL="$MCP_ISSUER_URL/protocol/openid-connect/certs"
+  # The Data Plane service lives on the same private host; only its port and client differ.
+  DATA_SERVICE_IPV4=${STRAM_QUANT_DATA_IPV4:-$PRIVATE_HOST_IPV4}
+  DATA_HOST=${KEYCLOAK_PUBLIC_URL#https://}
+  DATA_HOST=${DATA_HOST%%/*}
+  DATA_URL="https://$DATA_HOST:$DATA_SERVICE_PORT"
+  DATA_TOKEN_URL="$MCP_ISSUER_URL/protocol/openid-connect/token"
 }
 
 check_quant_host() {
-  local options field
-  options=$(findmnt -M "$LAKE" -n -o OPTIONS) || fail 'Dedicated lake mount is missing.'
-  for field in ro nosuid nodev noexec; do
-    case ",$options," in *",$field,"*) ;; *) fail "Lake mount is missing $field" ;; esac
-  done
-  as_quant test -r "$LAKE/_manifests/economic_observation/_active.json" || fail 'MCP cannot read the real lake.'
-  if as_quant touch "$LAKE/.quant-test-write" 2>/dev/null; then
-    as_quant rm -f "$LAKE/.quant-test-write" || true
-    fail 'Real lake is writable by the MCP account.'
-  fi
+  # The MCP no longer mounts or reads the lake; the Data Plane service owns it.
   [ "$(as_quant podman info --format '{{.Host.Security.Rootless}}')" = true ] || fail 'Quant Podman must be rootless.'
   as_quant podman image exists "$REVIEW_IMAGE" || fail "Review image is missing: $REVIEW_IMAGE"
   as_quant podman volume inspect "$AUDIT_VOLUME" >/dev/null || fail "Audit volume is missing: $AUDIT_VOLUME"
   as_quant podman secret inspect "$AUDIT_SECRET" >/dev/null || fail "Audit secret is missing: $AUDIT_SECRET"
+  as_quant podman secret inspect "$DATA_SECRET" >/dev/null || fail "Data Plane client secret is missing: $DATA_SECRET"
   [ "$(as_quant podman image inspect "$REVIEW_IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$EXPECTED_COMMIT" ] || fail 'Unexpected review-image source revision.'
 }
 
 probe_quant() {
   local image=${1:-$REVIEW_IMAGE}
-  msg 'Real-lake, audit and worker probes'
+  auth_values
+  msg 'Container isolation, preflight and Data Plane probes'
   as_quant podman run --rm --pull=never --network none \
     --userns=keep-id:uid=10001,gid=10001 --user 10001:10001 \
     --read-only --cap-drop=all --security-opt=no-new-privileges \
     --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
-    --mount "type=bind,src=$LAKE,dst=/lake,ro" \
     --mount "type=volume,src=$AUDIT_VOLUME,dst=/audit" \
     --secret "$AUDIT_SECRET,type=mount,target=audit-key,uid=10001,gid=10001,mode=0400" \
+    --secret "$DATA_SECRET,type=mount,target=$DATA_SECRET_TARGET,uid=10001,gid=10001,mode=0400" \
     --entrypoint /bin/sh "$image" -eu -c '
       test "$(id -u)" = 10001
       test -s /run/secrets/audit-key
-      test -r /lake/_manifests/economic_observation/_active.json
+      test -s /run/secrets/data-client-secret
+      test ! -e /lake
       touch /audit/.stram-test && rm /audit/.stram-test
-      if touch /lake/.stram-test 2>/dev/null; then exit 70; fi
       if touch /.stram-test 2>/dev/null; then exit 71; fi'
   as_quant podman run --rm --pull=never --network none \
     --userns=keep-id:uid=10001,gid=10001 --user 10001:10001 --read-only \
     --cap-drop=all --security-opt=no-new-privileges \
-    --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m "$image" worker-network-probe
-  as_quant podman run --rm --pull=never --network none \
+    --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
+    --secret "$DATA_SECRET,type=mount,target=$DATA_SECRET_TARGET,uid=10001,gid=10001,mode=0400" \
+    --env-file "$SERVICE_CONFIG" "$image" preflight
+  # The one probe that needs the network: it fetches a service token and reads the policies.
+  as_quant podman run --rm --pull=never --network "$QUANT_NETWORK" \
     --userns=keep-id:uid=10001,gid=10001 --user 10001:10001 --read-only \
     --cap-drop=all --security-opt=no-new-privileges \
     --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
-    --mount "type=bind,src=$LAKE,dst=/lake,ro" "$image" preflight
-  as_quant podman run --rm --pull=never --network none \
-    --cpus=2 --ulimit stack=2097152:2097152 \
-    --env MALLOC_ARENA_MAX=2 --env GLIBC_TUNABLES=glibc.malloc.arena_max=2 \
-    --userns=keep-id:uid=10001,gid=10001 --user 10001:10001 --read-only \
-    --cap-drop=all --security-opt=no-new-privileges \
-    --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
-    --mount "type=bind,src=$LAKE,dst=/lake,ro" "$image" worker-interface-probe
-  pass 'real lake remains read-only and production worker probes passed'
+    --secret "$DATA_SECRET,type=mount,target=$DATA_SECRET_TARGET,uid=10001,gid=10001,mode=0400" \
+    --add-host "$MCP_ALLOWED_HOSTS:$PRIVATE_HOST_IPV4" \
+    --add-host "$DATA_HOST:$DATA_SERVICE_IPV4" \
+    --env-file "$SERVICE_CONFIG" "$image" data-plane-probe
+  pass 'container isolation, preflight and live Data Plane probes passed (no lake mount)'
 }
 
 write_initial_configs() {
@@ -237,7 +239,10 @@ write_initial_configs() {
     install -o "$QUANT_USER" -g "$QUANT_USER" -m 0600 /dev/null "$SERVICE_CONFIG"
     cat > "$SERVICE_CONFIG" <<'EOF'
 # Non-secret configuration. Do not add tokens, passwords or keys.
-STRAM_MCP_PARQUET_ROOT=/lake
+STRAM_MCP_DATA_URL=https://CHANGE_ME.invalid:8444
+STRAM_MCP_DATA_TOKEN_URL=https://CHANGE_ME.invalid/realms/stram-staging/protocol/openid-connect/token
+STRAM_MCP_DATA_CLIENT_ID=stram-data-mcp-staging
+STRAM_MCP_DATA_CLIENT_SECRET_FILE=/run/secrets/data-client-secret
 STRAM_MCP_AUDIT_DB=/audit/audit.sqlite3
 STRAM_MCP_AUDIT_KEY_FILE=/run/secrets/audit-key
 STRAM_MCP_ISSUER_URL=https://CHANGE_ME.invalid/realms/stram-staging
@@ -248,8 +253,9 @@ STRAM_MCP_ALLOWED_HOSTS=CHANGE_ME.invalid
 STRAM_MCP_ALLOWED_ORIGINS=
 STRAM_MCP_BIND_HOST=0.0.0.0
 STRAM_MCP_BIND_PORT=8000
-STRAM_MCP_WORKER_MAX_RESTARTS=3
-STRAM_MCP_WORKER_RESTART_BACKOFF_SECONDS=0.25
+STRAM_MCP_DATA_MAX_CONCURRENT=4
+STRAM_MCP_DATA_BREAKER_THRESHOLD=5
+STRAM_MCP_DATA_BREAKER_COOLDOWN_SECONDS=15
 EOF
     chown "$QUANT_USER:$QUANT_USER" "$SERVICE_CONFIG"
   fi
@@ -279,16 +285,18 @@ EOF
 
 wire_service_config() {
   auth_values
-  python3 - "$SERVICE_CONFIG" "$MCP_ISSUER_URL" "$MCP_RESOURCE_URL" "$MCP_JWKS_URL" "$MCP_TENANT_ID" "$MCP_ALLOWED_HOSTS" <<'PY'
+  python3 - "$SERVICE_CONFIG" "$MCP_ISSUER_URL" "$MCP_RESOURCE_URL" "$MCP_JWKS_URL" "$MCP_TENANT_ID" "$MCP_ALLOWED_HOSTS" "$DATA_URL" "$DATA_TOKEN_URL" "$DATA_CLIENT_ID" <<'PY'
 import os, pathlib, sys, tempfile
 path = pathlib.Path(sys.argv[1])
 updates = dict(zip(
-    ("STRAM_MCP_ISSUER_URL", "STRAM_MCP_RESOURCE_URL", "STRAM_MCP_JWKS_URL", "STRAM_MCP_TENANT_ID", "STRAM_MCP_ALLOWED_HOSTS"),
+    ("STRAM_MCP_ISSUER_URL", "STRAM_MCP_RESOURCE_URL", "STRAM_MCP_JWKS_URL", "STRAM_MCP_TENANT_ID", "STRAM_MCP_ALLOWED_HOSTS", "STRAM_MCP_DATA_URL", "STRAM_MCP_DATA_TOKEN_URL", "STRAM_MCP_DATA_CLIENT_ID"),
     sys.argv[2:], strict=True,
 ))
 bounded_defaults = {
-    "STRAM_MCP_WORKER_MAX_RESTARTS": "3",
-    "STRAM_MCP_WORKER_RESTART_BACKOFF_SECONDS": "0.25",
+    "STRAM_MCP_DATA_CLIENT_SECRET_FILE": "/run/secrets/data-client-secret",
+    "STRAM_MCP_DATA_MAX_CONCURRENT": "4",
+    "STRAM_MCP_DATA_BREAKER_THRESHOLD": "5",
+    "STRAM_MCP_DATA_BREAKER_COOLDOWN_SECONDS": "15",
 }
 lines = path.read_text().splitlines()
 seen = set()
@@ -492,7 +500,7 @@ doctor() {
   else
     if id "$QUANT_USER" >/dev/null 2>&1; then pass 'stram-quant service identity exists'; else printf 'FAIL: stram-quant identity is missing\n'; fi
     if id "$AUTH_USER" >/dev/null 2>&1; then pass 'stram-auth service identity exists'; else not_verified 'stram-auth identity requires operator-approved creation'; fi
-    if findmnt -M "$LAKE" >/dev/null 2>&1; then pass 'dedicated Quant lake mount exists'; else printf 'FAIL: dedicated Quant lake mount is missing\n'; fi
+    if findmnt -M "$LAKE" >/dev/null 2>&1; then pass 'Stock lake mount exists (read by the Data Plane service, not by this MCP)'; else not_verified 'Stock lake mount is not visible on this host'; fi
     if [ -f "$SERVICE_CONFIG" ]; then pass 'Quant service configuration exists'; else not_verified 'Quant service configuration has not been prepared'; fi
     if [ -f "$AUTH_CONFIG" ]; then pass 'authentication configuration exists'; else not_verified 'authentication configuration has not been prepared'; fi
   fi
@@ -643,6 +651,7 @@ table inet stram_quant {
     type filter hook output priority filter; policy accept;
     meta skuid $quant_uid oifname "lo" ip saddr 127.0.0.1 ip daddr 127.0.0.1 tcp sport 8800 tcp flags != syn / syn,ack counter accept
     meta skuid $quant_uid ip daddr $PRIVATE_HOST_IPV4 tcp dport 443 counter accept
+    meta skuid $quant_uid ip daddr $DATA_SERVICE_IPV4 tcp dport $DATA_SERVICE_PORT counter accept
     meta skuid $quant_uid counter reject with icmpx type admin-prohibited
   }
 }
@@ -683,9 +692,10 @@ EOF
   nft list table inet stram_quant >/dev/null 2>&1 && nft delete table inet stram_quant
   systemctl enable --now stram-quant-egress.service
   nft list chain inet stram_quant output | grep -F "meta skuid $quant_uid ip daddr $PRIVATE_HOST_IPV4 tcp dport 443" >/dev/null || fail 'Quant allowlist rule is missing.'
+  nft list chain inet stram_quant output | grep -F "meta skuid $quant_uid ip daddr $DATA_SERVICE_IPV4 tcp dport $DATA_SERVICE_PORT" >/dev/null || fail 'Quant Data Plane allowlist rule is missing.'
   nft list chain inet stram_quant output | grep -F "meta skuid $quant_uid counter" >/dev/null || fail 'Quant default egress rejection rule is missing.'
   if [ "$quant_was_active" = yes ]; then as_quant systemctl --user start stram-quant-mcp.service; fi
-  pass 'persistent UID-scoped egress permits only SIDDU Tailscale HTTPS and rejects DNS/IPv4/IPv6 alternatives'
+  pass 'persistent UID-scoped egress permits only SIDDU Tailscale HTTPS plus the Data Plane service port and rejects DNS/IPv4/IPv6 alternatives'
 }
 
 auth_start() {
@@ -766,7 +776,7 @@ prepare_acceptance() {
 
 validate_approval() {
   auth_values
-  APPROVED_IMAGE=$(python3 - "$SERVICE_CONFIG" "$APPROVAL" "$MCP_ISSUER_URL" "$MCP_RESOURCE_URL" "$MCP_JWKS_URL" <<'PY'
+  APPROVED_IMAGE=$(python3 - "$SERVICE_CONFIG" "$APPROVAL" "$MCP_ISSUER_URL" "$MCP_RESOURCE_URL" "$MCP_JWKS_URL" "$DATA_URL" "$DATA_TOKEN_URL" "$DATA_CLIENT_ID" <<'PY'
 import pathlib, re, sys
 def parse(path):
     values = {}
@@ -781,10 +791,10 @@ def parse(path):
 try:
     service, approval = parse(sys.argv[1]), parse(sys.argv[2])
     exact = {"STRAM_MCP_ISSUER_URL": sys.argv[3], "STRAM_MCP_RESOURCE_URL": sys.argv[4], "STRAM_MCP_JWKS_URL": sys.argv[5]}
-    exact.update({"STRAM_MCP_PARQUET_ROOT": "/lake", "STRAM_MCP_AUDIT_DB": "/audit/audit.sqlite3", "STRAM_MCP_AUDIT_KEY_FILE": "/run/secrets/audit-key", "STRAM_MCP_BIND_HOST": "0.0.0.0", "STRAM_MCP_BIND_PORT": "8000", "STRAM_MCP_ALLOWED_ORIGINS": "", "STRAM_MCP_WORKER_MAX_RESTARTS": "3", "STRAM_MCP_WORKER_RESTART_BACKOFF_SECONDS": "0.25"})
+    exact.update({"STRAM_MCP_DATA_URL": sys.argv[6], "STRAM_MCP_DATA_TOKEN_URL": sys.argv[7], "STRAM_MCP_DATA_CLIENT_ID": sys.argv[8], "STRAM_MCP_DATA_CLIENT_SECRET_FILE": "/run/secrets/data-client-secret", "STRAM_MCP_AUDIT_DB": "/audit/audit.sqlite3", "STRAM_MCP_AUDIT_KEY_FILE": "/run/secrets/audit-key", "STRAM_MCP_BIND_HOST": "0.0.0.0", "STRAM_MCP_BIND_PORT": "8000", "STRAM_MCP_ALLOWED_ORIGINS": "", "STRAM_MCP_DATA_MAX_CONCURRENT": "4", "STRAM_MCP_DATA_BREAKER_THRESHOLD": "5", "STRAM_MCP_DATA_BREAKER_COOLDOWN_SECONDS": "15"})
     for key, value in exact.items():
         if service.get(key) != value: raise ValueError("incorrect " + key)
-    if any("SECRET" in key or "TOKEN" in key or "PASSWORD" in key or key in {"STRAM_MCP_ALLOW_INSECURE_HTTP", "STRAM_MCP_AUDIT_KEY"} for key in service):
+    if any(("SECRET" in key and not key.endswith("_SECRET_FILE")) or ("TOKEN" in key and not key.endswith("_TOKEN_URL")) or "PASSWORD" in key or key in {"STRAM_MCP_ALLOW_INSECURE_HTTP", "STRAM_MCP_AUDIT_KEY"} for key in service):
         raise ValueError("secrets and insecure HTTP are prohibited in service.env")
     image = approval.get("APPROVED_IMAGE_REF", "")
     if not re.fullmatch(r"[A-Za-z0-9._:/-]+(?::[A-Za-z0-9._-]+)?@sha256:[0-9a-f]{64}", image):
@@ -828,15 +838,16 @@ Memory=1536m
 Ulimit=stack=2097152:2097152
 PodmanArgs=--cpus=2
 Tmpfs=/tmp:rw,noexec,nosuid,nodev,size=64m
-Volume=$LAKE:/lake:ro,nosuid,nodev,noexec
 Volume=$AUDIT_VOLUME:/audit:rw,nosuid,nodev,noexec,nocopy
 Secret=$AUDIT_SECRET,type=mount,target=audit-key,uid=10001,gid=10001,mode=0400
+Secret=$DATA_SECRET,type=mount,target=$DATA_SECRET_TARGET,uid=10001,gid=10001,mode=0400
 EnvironmentFile=$SERVICE_CONFIG
 Environment=STRAM_MCP_IMAGE_DIGEST=${image##*@}
 Environment=MALLOC_ARENA_MAX=2
 Environment=GLIBC_TUNABLES=glibc.malloc.arena_max=2
 Network=$QUANT_NETWORK
 AddHost=$MCP_ALLOWED_HOSTS:$PRIVATE_HOST_IPV4
+AddHost=$DATA_HOST:$DATA_SERVICE_IPV4
 PublishPort=127.0.0.1:8800:8000
 StopTimeout=15
 
@@ -846,7 +857,6 @@ RestartSec=5s
 CPUQuota=200%
 TimeoutStartSec=90
 TimeoutStopSec=25
-ExecStartPre=/usr/bin/test -r $LAKE/_manifests/economic_observation/_active.json
 EOF
   if [ -e "$PERSISTENCE_MARKER" ]; then
     cat >> "$output" <<'EOF'
@@ -897,19 +907,11 @@ activate() {
   pass 'staging MCP readiness passed; unit remains boot-disabled'
 }
 
-verify_seccomp() {
-  as_quant podman exec stram-quant-mcp /bin/sh -eu -c '
-    main=$(awk "/^Seccomp_filters:/ {print \$2}" /proc/1/status)
-    max=$main
-    for status in /proc/[0-9]*/status; do
-      [ -r "$status" ] || continue
-      mode=$(awk "/^Seccomp:/ {print \$2}" "$status")
-      filters=$(awk "/^Seccomp_filters:/ {print \$2}" "$status")
-      [ "$mode" = 2 ] || continue
-      if [ "${filters:-0}" -gt "$max" ]; then max=$filters; fi
-    done
-    [ "$max" -gt "$main" ]
-    printf "PASS: worker process has an additional seccomp filter (main=%s worker=%s)\n" "$main" "$max"'
+verify_data_plane_link() {
+  # Fetches a service token and reads the policies from inside the running container.
+  as_quant podman exec stram-quant-mcp python -m stram_quant_mcp.entrypoint data-plane-probe \
+    | grep -F '"status":"data_plane_ok"' >/dev/null || fail 'The running MCP cannot reach the Data Plane service.'
+  printf 'PASS: running MCP fetched a service token and reached the Data Plane service\n'
 }
 
 verify_egress_denials() {
@@ -946,7 +948,7 @@ verify() {
   auth_values
   auth_verify
   curl --fail --silent --max-time 3 http://127.0.0.1:8800/health/ready >/dev/null || fail 'MCP is not ready.'
-  verify_seccomp
+  verify_data_plane_link
   verify_egress_denials
   [ -x "$REPO_ROOT/.venv/bin/python" ] || fail 'Frozen repository environment is missing.'
   run_acceptance
@@ -956,26 +958,21 @@ reliability_drill() {
   require_root
   auth_values
   [ -x "$REPO_ROOT/.venv/bin/python" ] || fail 'Frozen repository environment is missing.'
-  local worker_pid
-  worker_pid=$(as_quant podman exec stram-quant-mcp /bin/sh -eu -c '
-    main=$(awk "/^Seccomp_filters:/ {print \$2}" /proc/1/status)
-    for status in /proc/[0-9]*/status; do
-      [ -r "$status" ] || continue
-      pid=$(awk "/^Pid:/ {print \$2}" "$status")
-      parent=$(awk "/^PPid:/ {print \$2}" "$status")
-      filters=$(awk "/^Seccomp_filters:/ {print \$2}" "$status")
-      if [ "$pid" != 1 ] && [ "$parent" = 1 ] && [ "${filters:-0}" -gt "$main" ]; then
-        printf "%s\n" "$pid"
-        exit 0
-      fi
-    done
-    exit 1') || fail 'Unable to identify the production query worker.'
-  # The slim runtime image has no kill(1) binary; use the POSIX shell builtin.
-  as_quant podman exec stram-quant-mcp /bin/sh -eu -c 'kill -STOP "$1"' sh "$worker_pid"
+  local quant_uid drill_table=stram_quant_drill
+  quant_uid=$(id -u "$QUANT_USER") || fail 'Missing stram-quant identity.'
+  # Simulate a Data Plane outage for the MCP user only, then always remove the simulation.
+  trap 'nft delete table inet stram_quant_drill >/dev/null 2>&1 || true' EXIT
+  nft add table inet "$drill_table"
+  nft add chain inet "$drill_table" output '{ type filter hook output priority -10; policy accept; }'
+  nft add rule inet "$drill_table" output meta skuid "$quant_uid" ip daddr "$DATA_SERVICE_IPV4" tcp dport "$DATA_SERVICE_PORT" reject
   if run_acceptance; then
-    fail 'Paused production worker did not trigger a bounded tool timeout.'
+    fail 'A blocked Data Plane did not produce classified, retryable tool errors.'
   fi
-  curl --retry 10 --retry-delay 1 --fail --silent --max-time 3 http://127.0.0.1:8800/health/ready >/dev/null || fail 'Worker did not recover after its hard timeout.'
+  curl --fail --silent --max-time 3 http://127.0.0.1:8800/health/ready >/dev/null || fail 'An upstream outage must not make the MCP unready.'
+  nft delete table inet "$drill_table"
+  trap - EXIT
+  # The circuit breaker re-probes after its cooldown (15 seconds by default).
+  sleep 20
   run_acceptance
   as_quant systemctl --user restart stram-quant-mcp.service
   wait_for_mcp_readiness 30 || fail 'Service did not recover from a controlled restart.'
@@ -986,7 +983,7 @@ reliability_drill() {
   grep -q '^Restart=on-failure$' <<<"$restart_policy" || fail 'Service restart policy is not on-failure.'
   grep -q '^StartLimitBurst=3$' <<<"$restart_policy" || fail 'Service restart burst is not bounded to three.'
   grep -Eq '^StartLimitIntervalUSec=(2min|120s)$' <<<"$restart_policy" || fail 'Service restart interval is not bounded to 120 seconds.'
-  pass 'live worker timeout/failure/recovery and controlled service restart passed'
+  pass 'Data Plane outage, circuit-breaker recovery and controlled service restart passed'
 }
 
 backup_audit() {
@@ -1137,7 +1134,7 @@ rollback() {
   as_quant systemctl --user daemon-reload
   as_quant systemctl --user restart stram-quant-mcp.service
   wait_for_mcp_readiness 30 || fail 'Rollback readiness failed.'
-  pass 'previous digest restored readiness; audit backup/checkpoint preserved and lake was untouched'
+  pass 'previous digest restored readiness; audit backup/checkpoint preserved and the Data Plane was untouched'
 }
 
 restore_approved() {
@@ -1155,7 +1152,7 @@ restore_approved() {
   as_quant systemctl --user daemon-reload
   as_quant systemctl --user restart stram-quant-mcp.service
   wait_for_mcp_readiness 30 || fail 'Approved-image recovery readiness failed.'
-  pass 'approved digest recovered after the rollback drill; audit volume and lake were preserved'
+  pass 'approved digest recovered after the rollback drill; audit volume was preserved'
 }
 
 enable_services() {
