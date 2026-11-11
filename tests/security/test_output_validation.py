@@ -44,6 +44,24 @@ async def test_a_non_json_reply_is_rejected_without_echoing_it(
 
 
 @pytest.mark.asyncio
+async def test_latest_quotes_rejects_reordered_data_plane_rows(
+    backend: HttpDataBackend, data_plane: FakeDataPlane
+) -> None:
+    data_plane.script(
+        lambda request: (
+            data_plane.quote_response(("AAPL", "SPY"))
+            if request.url.path == "/v1/market/quotes"
+            else None
+        )
+    )
+
+    with pytest.raises(errors.ToolUpstreamError) as raised:
+        await backend.call("quant_get_latest_quotes", {"symbols": ["SPY", "AAPL"]}, "req-1", 5.0)
+
+    assert "requested order" in raised.value.reason
+
+
+@pytest.mark.asyncio
 async def test_unknown_tools_and_extra_arguments_never_reach_the_data_plane(
     backend: HttpDataBackend, data_plane: FakeDataPlane
 ) -> None:
@@ -88,6 +106,7 @@ async def test_every_successful_envelope_round_trips_its_declared_output_model(
             "end_date": "2026-10-02",
             "horizons": [1],
         },
+        "quant_get_latest_quotes": {"symbols": ["SPY"]},
     }
     if tool == "quant_get_lineage":
         derived = await backend.call("quant_get_derived", examples["quant_get_derived"], "seed", 5)

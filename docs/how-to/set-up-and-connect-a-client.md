@@ -14,7 +14,7 @@ staging or production access and must not be run without separate authorization.
   reachable JWKS endpoint. Local automated integration generates an ephemeral test identity instead.
 
 The exact runtime dependency is `stram-data` 1.9.0 at Git commit
-`3059c1e1932a05dfbe8db4dd25b00b3a286d6fca`, used for typed models only; `uv.lock` is authoritative.
+`65e9d7938bb9ef382a063b83d94d779b2a1f8f14`, used for typed models only; `uv.lock` is authoritative.
 
 ## Local development
 
@@ -37,7 +37,7 @@ uv run pytest tests/contract tests/security/test_no_sql_or_execution.py -q
 uv run pytest tests/integration/test_read_tools.py tests/integration/test_analytics_tools.py -q
 ```
 
-Expected: the contract pin, all ten direct Data Interface mappings, exact decimal handling,
+Expected: the contract pin, all eleven direct Data Interface mappings, exact decimal handling,
 availability modes, revisions, lineage and analytics semantics pass against `tests/fixtures/lake`.
 
 ## Start and connect with a test identity
@@ -50,7 +50,7 @@ uv run pytest tests/integration/test_mcp_client.py -q
 
 It performs the entire workflow: chooses a loopback port, generates an ephemeral RSA key, signs a
 five-minute JWT with all four tool scopes, starts authenticated Streamable HTTP, initializes the
-official MCP client, lists ten tools, calls `quant_list_series`, verifies a genuine synthetic-lake
+official MCP client, lists eleven tools, calls `quant_list_series`, verifies a genuine synthetic-lake
 record and shuts down. The Data Plane HTTP service is the real `stram_data` application run in-process over
 the synthetic lake; only identity material and the network are local and ephemeral.
 
@@ -104,7 +104,7 @@ async def read_catalog(endpoint: str) -> dict[str, object]:
     ):
         await session.initialize()
         tools = await session.list_tools()
-        assert len(tools.tools) == 10
+        assert len(tools.tools) == 11
         result = await session.call_tool("quant_list_series", {"limit": 1})
         if result.is_error or result.structured_content is None:
             raise RuntimeError("quantitative call failed")

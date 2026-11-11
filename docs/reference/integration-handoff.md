@@ -7,7 +7,7 @@ approved yet.
 
 ## 1. What you are integrating
 
-The Quant MCP is a read-only [MCP](https://modelcontextprotocol.io) server with ten typed tools over
+The Quant MCP is a read-only [MCP](https://modelcontextprotocol.io) server with eleven typed tools over
 quantitative data (economic series, market bars, positioning, derived indicators, lineage, aligned
 panels and conditional-return studies). It does no calculation of its own: every number comes from the
 Data Plane service, which the MCP calls over HTTP with its own service identity.
@@ -69,7 +69,7 @@ test fixtures and must not be reused.
 | Scope | Tools it unlocks |
 |---|---|
 | `quant:discover` | `quant_list_series`, `quant_list_indicators`, `quant_list_indicator_subjects`, `quant_describe_availability`, `quant_get_freshness` |
-| `quant:read` | `quant_get_series`, `quant_get_derived` |
+| `quant:read` | `quant_get_latest_quotes`, `quant_get_series`, `quant_get_derived` |
 | `quant:lineage` | `quant_get_lineage` |
 | `quant:analytics` | `quant_get_aligned_panel`, `quant_get_conditional_returns` |
 
@@ -106,6 +106,7 @@ in [`contracts/tool_schemas.json`](../../contracts/tool_schemas.json).
 | `quant_list_indicator_subjects` | discover | Find subjects of one indicator | `indicator_id` | 10 s |
 | `quant_describe_availability` | discover | Learn what strict, estimated and ex_post mean per dataset | none | 10 s |
 | `quant_get_freshness` | discover | Check how current each dataset is | none | 10 s |
+| `quant_get_latest_quotes` | read | Read current IEX top-of-book quotes | 1-30 distinct `symbols`, optional `max_age_ms` 1-15000 | 10 s |
 | `quant_get_series` | read | Read observations with revisions | `start_date`, `end_date`, one of `series_keys`/`indicator_ids`/`provider`, `availability`, `limit` | 10 s |
 | `quant_get_derived` | read | Read one derived indicator | `indicator_id`, dates, `subject`, `availability` | 10 s |
 | `quant_get_lineage` | lineage | Trace a derived value to its sources | `event_id` (UUID) | 10 s |

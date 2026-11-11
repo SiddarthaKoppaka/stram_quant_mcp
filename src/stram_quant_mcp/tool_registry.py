@@ -22,6 +22,8 @@ from stram_quant_mcp.tool_models import (
     IndicatorsEnvelope,
     IndicatorSubjectsEnvelope,
     IndicatorSubjectsInput,
+    LatestQuotesEnvelope,
+    LatestQuotesInput,
     LineageEnvelope,
     LineageInput,
     PanelEnvelope,
@@ -142,6 +144,14 @@ TOOL_SPECS = (
         ConditionalReturnsInput,
         ConditionalReturnsEnvelope,
         20.0,
+    ),
+    ToolSpec(
+        "quant_get_latest_quotes",
+        TOOL_DOCS["quant_get_latest_quotes"].render(),
+        "quant:read",
+        LatestQuotesInput,
+        LatestQuotesEnvelope,
+        10.0,
     ),
 )
 

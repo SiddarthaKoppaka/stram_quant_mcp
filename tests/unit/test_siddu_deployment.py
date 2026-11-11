@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import socket
 import subprocess
 import time
@@ -80,8 +81,10 @@ def _write_self_signed_tls(tmp_path: Path) -> tuple[Path, Path]:
 
 def test_siddu_installer_is_valid_and_keeps_activation_gates() -> None:
     # The executable and reviewed repository path are fixed test inputs.
-    subprocess.run(["/usr/bin/bash", "-n", str(INSTALLER)], check=True)  # noqa: S603
-    subprocess.run(["/usr/bin/bash", "-n", str(COMPLETION)], check=True)  # noqa: S603
+    bash = shutil.which("bash")
+    assert bash is not None, "bash is required to validate the reviewed shell installers"
+    subprocess.run([bash, "-n", str(INSTALLER)], check=True)  # noqa: S603
+    subprocess.run([bash, "-n", str(COMPLETION)], check=True)  # noqa: S603
     text = INSTALLER.read_text()
 
     assert "start-dev" not in text

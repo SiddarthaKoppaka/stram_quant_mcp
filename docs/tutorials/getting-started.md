@@ -1,7 +1,7 @@
 # Getting started
 
 In this tutorial you will install the project, start the real MCP server on your machine with a
-throwaway identity, and watch an MCP client discover the ten tools and read a record from a small
+throwaway identity, and watch an MCP client discover the eleven tools and read a record from a small
 synthetic dataset. Nothing here touches production data, credentials or the network beyond loopback.
 
 You need CPython 3.12 or newer, `uv`, and Git. Read access to the pinned `stram_data` source is needed
@@ -35,7 +35,7 @@ You should see a single dot and `1 passed`.
 
 That one test did the whole job: it generated a temporary signing key, signed a five-minute token,
 started the authenticated server on a free loopback port, connected with the official MCP client,
-listed the ten tools, called `quant_list_series`, checked the record it got back, and shut everything
+listed the eleven tools, called `quant_list_series`, checked the record it got back, and shut everything
 down.
 
 ## 4. Look at what the client received

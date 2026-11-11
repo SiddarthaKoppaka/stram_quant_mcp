@@ -10,7 +10,7 @@ import stram_data
 import stram_data.data_interface as public
 
 ROOT = Path(__file__).parents[2]
-SNAPSHOT = json.loads((ROOT / "contracts/data_interface.v1.9.0.json").read_text())
+SNAPSHOT = json.loads((ROOT / "contracts/data_interface.realtime-batch.json").read_text())
 
 
 def test_exact_data_interface_release_is_installed() -> None:

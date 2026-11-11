@@ -1,7 +1,7 @@
 # Stram Quant MCP
 
 Stram Quant MCP is the independently deployed, read-only MCP Tool Plane for Stram quantitative
-data. Ten typed tools expose the Stram Data Plane service (Data Interface v1, service 1.9 or later)
+data. Eleven typed tools expose the Stram Data Plane service (Data Interface v1, service 1.9 or later)
 over authenticated Streamable HTTP. This repository owns transport, identity, authorization, bounds,
 failure classification, audit and telemetry. It does not own SQL, financial calculations, ingestion, lake schemas or AI
 orchestration.
@@ -44,7 +44,7 @@ uv run pytest tests/integration/test_mcp_client.py -q
 ```
 
 The integration test starts the real server on loopback, signs a short-lived JWT, connects with the
-official MCP SDK client, discovers all ten tools and calls the real Data Plane HTTP service, run in-process
+official MCP SDK client, discovers all eleven tools and calls the real Data Plane HTTP service, run in-process
 over `tests/fixtures/lake`. It does not use production credentials or mocked quantitative responses.
 
 Run the complete local gate:

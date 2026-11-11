@@ -13,6 +13,7 @@ from stram_data.data_interface import (
     ConditionalReturnsResult,
     DerivedQuery,
     DerivedResult,
+    MarketDataBatchQuery,
     PanelColumn,
     PanelQuery,
     PanelResult,
@@ -39,6 +40,8 @@ from stram_quant_mcp.tool_models import (
     IndicatorsData,
     IndicatorSubjectsData,
     IndicatorSubjectsInput,
+    LatestQuotesData,
+    LatestQuotesInput,
     LineageInput,
     PanelInput,
     SeriesInput,
@@ -125,6 +128,7 @@ class QuantToolAdapter:
             "quant_get_lineage": self._lineage,
             "quant_get_aligned_panel": self._panel,
             "quant_get_conditional_returns": self._conditional_returns,
+            "quant_get_latest_quotes": self._latest_quotes,
         }
 
     async def _catalog(self, request: BaseModel, deadline: float) -> BaseModel:
@@ -172,6 +176,18 @@ class QuantToolAdapter:
     async def _conditional_returns(self, request: BaseModel, deadline: float) -> BaseModel:
         query = _conditional_query(cast(ConditionalReturnsInput, request))
         return await self._gateway.get_conditional_returns(query, deadline_seconds=deadline)
+
+    async def _latest_quotes(self, request: BaseModel, deadline: float) -> BaseModel:
+        latest = cast(LatestQuotesInput, request)
+        quotes = await self._gateway.get_latest_quotes(
+            MarketDataBatchQuery(symbols=latest.symbols, max_age_ms=latest.max_age_ms),
+            deadline_seconds=deadline,
+        )
+        if tuple(quote.symbol for quote in quotes) != latest.symbols:
+            raise ToolUpstreamError(
+                "The Data Plane returned quote symbols that do not match the requested order."
+            )
+        return LatestQuotesData(quotes=quotes)
 
 
 def _panel_query(request: PanelInput) -> PanelQuery:

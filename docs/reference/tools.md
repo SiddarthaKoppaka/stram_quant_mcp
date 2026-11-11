@@ -1,6 +1,6 @@
 # Tool reference
 
-This is the operator and consumer reference for the ten tools implemented in
+This is the operator and consumer reference for the eleven tools implemented in
 `src/stram_quant_mcp/tool_registry.py`. Machine-readable schemas and reviewed SHA-256 hashes are in
 `contracts/tool_schemas.json`; MCP `tools/list` returns the same input/output schemas and read-only
 annotations.
@@ -115,6 +115,22 @@ words.
   is descriptive and is not proof of completeness.
 
 ## Read tools
+
+### `quant_get_latest_quotes`
+
+- Scope: `quant:read`
+- Data Interface: `get_latest_quotes(MarketDataBatchQuery)` through `POST /v1/market/quotes`.
+  The MCP's Data Plane identity requests the licensed `market:iex` entitlement; an MCP caller needs
+  only `quant:read`.
+- Input: `symbols`, 1 to 30 distinct uppercase symbols using letters, digits, `.`, `/` or `-`; optional
+  `max_age_ms`, 1 to 15,000 (default 15,000).
+- Data: exactly one IEX-only availability-aware result for each requested symbol, in the requested
+  order. A fresh result carries bid and ask; unavailable, missing or stale data remains explicit and
+  is never substituted with a trade, daily close or consolidated quote.
+
+```json
+{"symbols":["SPY","AAPL"],"max_age_ms":15000}
+```
 
 ### `quant_get_series`
 
