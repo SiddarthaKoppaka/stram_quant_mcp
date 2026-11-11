@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 import httpx2
 import pytest
 
@@ -55,12 +57,29 @@ async def test_a_valid_token_yields_only_the_minimal_identity(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("missing", ["iat", "sub", "client_id", "tenant_id", "scope"])
+@pytest.mark.parametrize("missing", ["exp", "iat", "sub", "client_id", "tenant_id", "scope"])
 async def test_a_token_missing_a_required_claim_is_rejected(tmp_path, missing: str) -> None:
     minter = TokenMinter()
     verifier = StrictVerifier(parity_settings(tmp_path), public_key=minter.public_key_pem())
 
     assert await verifier.verify_token(minter.mint("quant:read", drop=(missing,))) is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"iat": time.time() + 600},
+        {"nbf": time.time() + 600},
+        {"iat": time.time() - 1, "exp": time.time() + 3_600},
+    ],
+    ids=["future-iat", "future-nbf", "excessive-lifetime"],
+)
+async def test_a_token_with_invalid_temporal_claims_is_rejected(tmp_path, overrides) -> None:
+    minter = TokenMinter()
+    verifier = StrictVerifier(parity_settings(tmp_path), public_key=minter.public_key_pem())
+
+    assert await verifier.verify_token(minter.mint("quant:read", overrides=overrides)) is None
 
 
 @pytest.mark.asyncio

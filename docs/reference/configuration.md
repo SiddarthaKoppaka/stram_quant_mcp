@@ -26,6 +26,8 @@ truth is [`settings.py`](../../src/stram_quant_mcp/settings.py).
 |---|---|---|
 | `STRAM_MCP_ALLOWED_ORIGINS` | empty | Comma-separated browser origins; empty for non-browser clients |
 | `STRAM_MCP_ALLOWED_ALGORITHMS` | `RS256` | Reviewed asymmetric JWT algorithms |
+| `STRAM_MCP_JWT_CLOCK_SKEW_SECONDS` | `30` | Allowed clock skew when evaluating `iat`, `exp`, and optional `nbf`; 0 to 300 seconds |
+| `STRAM_MCP_JWT_MAX_LIFETIME_SECONDS` | `900` | Maximum permitted `exp - iat` access-token lifetime; greater than 0 and at most 3600 seconds |
 | `STRAM_MCP_ALLOW_INSECURE_HTTP` | unset | `1` permits plain HTTP, for loopback tests only |
 | `STRAM_MCP_IMAGE_DIGEST` | `development` | Image digest recorded in audit and telemetry |
 | `STRAM_MCP_OTLP_ENDPOINT` | unset | OpenTelemetry collector URL |
@@ -47,7 +49,10 @@ Defaults that affect security or correctness need review before they change; rec
 ## Token requirements
 
 Access tokens must carry `iss`, `aud`, `sub`, `client_id` or `azp`, the tenant claim (`tenant_id`),
-`scope` or `scp`, `iat` and `exp`. `nbf` is checked when present.
+`scope` or `scp`, numeric `iat`, and numeric `exp`. They are rejected when expired, issued too far in
+the future, have a non-positive or over-limit lifetime, or carry an `nbf` that is too far in the
+future. `nbf` is optional, but when present must be numeric and valid under the configured clock
+skew.
 
 ## Qual client policy
 

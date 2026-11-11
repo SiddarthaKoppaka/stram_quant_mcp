@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from urllib.parse import urlsplit
 
 import httpx2
@@ -79,9 +80,36 @@ class StrictVerifier(JWTVerifier):
             return False
         if not isinstance(claims.get("sub"), str) or not claims["sub"]:
             return False
-        if not isinstance(client_id, str) or not client_id or not claims.get("iat"):
+        if not isinstance(client_id, str) or not client_id:
+            return False
+        if not self._has_valid_temporal_claims(claims):
             return False
         return bool(scopes) and all(len(scope) <= MAX_SCOPE_LENGTH for scope in scopes)
+
+    def _has_valid_temporal_claims(self, claims: dict[str, object]) -> bool:
+        """Require a bounded, currently usable access token, not just a valid signature."""
+        issued_at = _numeric_date(claims.get("iat"))
+        expires_at = _numeric_date(claims.get("exp"))
+        not_before = _numeric_date(claims.get("nbf"))
+        if issued_at is None or expires_at is None:
+            return False
+        now = time.time()
+        skew = self._settings.jwt_clock_skew_seconds
+        if issued_at > now + skew or expires_at <= now - skew:
+            return False
+        if expires_at <= issued_at or (
+            expires_at - issued_at > self._settings.jwt_max_lifetime_seconds
+        ):
+            return False
+        return not (not_before is not None and (not_before > now + skew or not_before > expires_at))
+
+
+def _numeric_date(value: object) -> float | None:
+    """Return a JWT NumericDate without accepting booleans or non-finite values."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    result = float(value)
+    return result if result == result and result not in (float("inf"), float("-inf")) else None
 
 
 class QuantAuthProvider(KeycloakAuthProvider):

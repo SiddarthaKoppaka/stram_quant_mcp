@@ -26,6 +26,8 @@ class AppSettings(BaseModel):
     tenant_id: str = Field(min_length=1, max_length=100, pattern=r"^[A-Za-z0-9_.:-]+$")
     tenant_claim: str = Field(default="tenant_id", pattern=r"^[A-Za-z0-9_.:-]{1,64}$")
     allowed_algorithms: tuple[str, ...] = ("RS256",)
+    jwt_clock_skew_seconds: float = Field(default=30.0, ge=0, le=300)
+    jwt_max_lifetime_seconds: float = Field(default=900.0, gt=0, le=3600)
     allowed_hosts: tuple[str, ...] = Field(min_length=1, max_length=16)
     allowed_origins: tuple[str, ...] = Field(default=(), max_length=16)
     queue_wait_seconds: float = Field(default=2.0, gt=0, le=30)
@@ -116,6 +118,8 @@ class AppSettings(BaseModel):
             "backend_shutdown_seconds": "STRAM_MCP_BACKEND_SHUTDOWN_SECONDS",
             "denial_limit": "STRAM_MCP_DENIAL_LIMIT",
             "denial_window_seconds": "STRAM_MCP_DENIAL_WINDOW_SECONDS",
+            "jwt_clock_skew_seconds": "STRAM_MCP_JWT_CLOCK_SKEW_SECONDS",
+            "jwt_max_lifetime_seconds": "STRAM_MCP_JWT_MAX_LIFETIME_SECONDS",
         }
         values.update(
             {
