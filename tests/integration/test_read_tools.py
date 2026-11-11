@@ -12,6 +12,7 @@ from stram_quant_mcp.tool_models import (
     FreshnessEnvelope,
     IndicatorsEnvelope,
     IndicatorSubjectsEnvelope,
+    LatestQuotesEnvelope,
     LineageEnvelope,
     SeriesEnvelope,
 )
@@ -99,6 +100,11 @@ def test_all_eight_read_and_discovery_tools_use_the_real_interface(
     assert isinstance(lineage, LineageEnvelope)
     assert {item.series_key for item in lineage.data.inputs} == {"UST_10YEAR", "UST_2YEAR"}
     assert lineage.data.unresolved_input_ids == ()
+
+    latest = tool_adapter.execute("quant_get_latest_quotes", {"symbols": ["SPY", "AAPL"]}, "quotes")
+    assert isinstance(latest, LatestQuotesEnvelope)
+    assert [quote.symbol for quote in latest.data.quotes] == ["SPY", "AAPL"]
+    assert all(quote.status == "ok" and quote.quote is not None for quote in latest.data.quotes)
 
 
 def test_truncation_and_hindsight_are_explicit(tool_adapter: SyncAdapter) -> None:

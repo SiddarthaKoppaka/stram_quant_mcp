@@ -21,7 +21,9 @@ from stram_data.data_interface import (
     DerivedResult,
     FreshnessReport,
     IndicatorInfo,
+    LatestQuote,
     LineageResult,
+    MarketDataBatchQuery,
     PanelQuery,
     PanelResult,
     PolicyInfo,
@@ -36,6 +38,7 @@ _CATALOG: Final = TypeAdapter(tuple[CatalogEntry, ...])
 _INDICATORS: Final = TypeAdapter(tuple[IndicatorInfo, ...])
 _POLICIES: Final = TypeAdapter(tuple[PolicyInfo, ...])
 _SUBJECTS: Final = TypeAdapter(tuple[str, ...])
+_LATEST_QUOTES: Final = TypeAdapter(tuple[LatestQuote, ...])
 _INTERFACE_PATTERN: Final = re.compile(r"Data Interface v(\d+)")
 _VERSION_PATTERN: Final = re.compile(r"^(\d+)\.(\d+)\.(\d+)")
 MAX_REPORTED_FIELDS: Final = 3
@@ -130,6 +133,13 @@ class DataGateway:
         """Query conditional returns (POST /v1/conditional-returns/query)."""
         raw = await self._post("/v1/conditional-returns/query", query, deadline_seconds)
         return _parse(ConditionalReturnsResult, raw)
+
+    async def get_latest_quotes(
+        self, query: MarketDataBatchQuery, *, deadline_seconds: float
+    ) -> tuple[LatestQuote, ...]:
+        """Read bounded IEX top-of-book results (POST /v1/market/quotes)."""
+        raw = await self._post("/v1/market/quotes", query, deadline_seconds)
+        return _parse(_LATEST_QUOTES, raw)
 
     async def _post(self, path: str, query: BaseModel, deadline_seconds: float) -> bytes:
         # Hindsight reads need an extra, separately requested scope; nothing else does.

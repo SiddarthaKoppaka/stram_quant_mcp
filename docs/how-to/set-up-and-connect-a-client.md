@@ -14,7 +14,7 @@ staging or production access and must not be run without separate authorization.
   reachable JWKS endpoint. Local automated integration generates an ephemeral test identity instead.
 
 The exact runtime dependency is `stram-data` 1.9.0 at Git commit
-`3059c1e1932a05dfbe8db4dd25b00b3a286d6fca`, used for typed models only; `uv.lock` is authoritative.
+`65e9d7938bb9ef382a063b83d94d779b2a1f8f14`, used for typed models only; `uv.lock` is authoritative.
 
 ## Local development
 

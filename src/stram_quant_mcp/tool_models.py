@@ -14,6 +14,7 @@ from stram_data.data_interface import (
     DerivedResult,
     FreshnessReport,
     IndicatorInfo,
+    LatestQuote,
     LineageResult,
     PanelResult,
     PolicyInfo,
@@ -33,6 +34,10 @@ Kind = Literal["economic", "rates", "market_bar", "positioning", "derived"]
 Key = Annotated[
     str,
     StringConstraints(min_length=1, max_length=100, pattern=r"^[A-Za-z0-9_.:\-^=/ ]+$"),
+]
+MarketSymbol = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=20, pattern=r"^[A-Z0-9./-]+$"),
 ]
 
 
@@ -191,6 +196,19 @@ class ConditionalReturnsInput(DateRangeInput):
         return self
 
 
+class LatestQuotesInput(ContractModel):
+    """A bounded IEX top-of-book request, not a daily-price request."""
+
+    symbols: tuple[MarketSymbol, ...] = Field(min_length=1, max_length=30)
+    max_age_ms: int = Field(default=15_000, ge=1, le=15_000)
+
+    @model_validator(mode="after")
+    def validate_symbols(self) -> LatestQuotesInput:
+        if len(set(self.symbols)) != len(self.symbols):
+            raise ValueError("symbols must not contain duplicates")
+        return self
+
+
 class CatalogData(ContractModel):
     entries: tuple[CatalogEntry, ...]
 
@@ -205,6 +223,12 @@ class IndicatorSubjectsData(ContractModel):
 
 class AvailabilityPoliciesData(ContractModel):
     policies: tuple[PolicyInfo, ...]
+
+
+class LatestQuotesData(ContractModel):
+    """IEX results in request order; each item carries its own availability status."""
+
+    quotes: tuple[LatestQuote, ...]
 
 
 # --- Clean view ---------------------------------------------------------------------------
@@ -383,3 +407,4 @@ DerivedEnvelope = ToolEnvelope[DerivedResult | CleanDerivedData]
 LineageEnvelope = ToolEnvelope[LineageResult]
 PanelEnvelope = ToolEnvelope[PanelResult | CleanPanelData]
 ConditionalReturnsEnvelope = ToolEnvelope[ConditionalReturnsResult | CleanConditionalReturnsData]
+LatestQuotesEnvelope = ToolEnvelope[LatestQuotesData]

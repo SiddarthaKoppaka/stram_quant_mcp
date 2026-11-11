@@ -35,6 +35,7 @@ def test_every_real_result_round_trips_through_its_output_contract(
         "quant_list_indicator_subjects": {"indicator_id": "equity_return_1d"},
         "quant_describe_availability": {},
         "quant_get_freshness": {},
+        "quant_get_latest_quotes": {"symbols": ["SPY"]},
         "quant_get_series": {
             "series_keys": ["SPY"],
             "kinds": ["market_bar"],

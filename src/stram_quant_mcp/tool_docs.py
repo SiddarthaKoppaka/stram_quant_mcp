@@ -150,4 +150,15 @@ TOOL_DOCS: dict[str, ToolDocs] = {
         "their lineage.",
         ("resource_limit",),
     ),
+    "quant_get_latest_quotes": ToolDocs(
+        "Read the latest stored Alpaca IEX top-of-book quotes for a bounded symbol set.",
+        "a screen or analysis needs fresh IEX bid and ask data with its exact event time and "
+        "availability state.",
+        "daily closes, trades, consolidated market data, or a last price; this tool returns "
+        "only IEX quotes and never substitutes another value.",
+        "symbols (1-30 distinct uppercase symbols using A-Z, digits, '.', '/' or '-'); max_age_ms "
+        "1-15000, default 15000.",
+        "one result per requested symbol in request order. Each result has status, reason, "
+        "provenance and, only when fresh, bid and ask values.",
+    ),
 }

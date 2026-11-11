@@ -4726,6 +4726,396 @@
       },
       "schemaHash": "9571870dfbf234fa40641f6cdef7f21b35966796367ec1dfe7d41a63d5e5c019",
       "scope": "quant:analytics"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Read the latest stored Alpaca IEX top-of-book quotes for a bounded symbol set.\n\nUse when: a screen or analysis needs fresh IEX bid and ask data with its exact event time and availability state.\nDo not use for: daily closes, trades, consolidated market data, or a last price; this tool returns only IEX quotes and never substitutes another value.\nInputs: symbols (1-30 distinct uppercase symbols using A-Z, digits, '.', '/' or '-'); max_age_ms 1-15000, default 15000.\nReturns: one result per requested symbol in request order. Each result has status, reason, provenance and, only when fresh, bid and ask values.\nRead-only and idempotent; safe to call again.\n\nFailures return isError=true and _meta['io.stram/error'] with code, category, retryable, reason and next_action:\n- invalid_request: an argument is wrong; the reason names the field. Fix it. Not retryable.\n- access_denied: the token lacks this tool's scope. Not retryable; ask the administrator.\n- unavailable: the Data Plane is down or paused. Retryable with backoff; honour retry_after_seconds.\n- overloaded: capacity or rate limit reached. Retryable after retry_after_seconds.\n- deadline_exceeded: too slow. Retry once with a narrower range or fewer series.\n- data_plane_error, service_credentials_rejected, data_plane_forbidden: a server-side fault. Not retryable; report the request_id.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "A bounded IEX top-of-book request, not a daily-price request.",
+        "properties": {
+          "max_age_ms": {
+            "default": 15000,
+            "maximum": 15000,
+            "minimum": 1,
+            "title": "Max Age Ms",
+            "type": "integer"
+          },
+          "symbols": {
+            "items": {
+              "maxLength": 20,
+              "minLength": 1,
+              "pattern": "^[A-Z0-9./-]+$",
+              "type": "string"
+            },
+            "maxItems": 30,
+            "minItems": 1,
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "symbols"
+        ],
+        "title": "LatestQuotesInput",
+        "type": "object"
+      },
+      "name": "quant_get_latest_quotes",
+      "outputSchema": {
+        "$defs": {
+          "LatestQuote": {
+            "additionalProperties": false,
+            "description": "`quote` is set only when status is ok. For stale, the old value is in `last_quote`.",
+            "properties": {
+              "feed": {
+                "enum": [
+                  "iex",
+                  "finnhub",
+                  "yahoo"
+                ],
+                "title": "Feed",
+                "type": "string"
+              },
+              "last_observed_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Observed At"
+              },
+              "last_quote": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/QuoteValues"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "market_data": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/MarketDataProvenance"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "next_action": {
+                "enum": [
+                  "none",
+                  "request_subscription",
+                  "await_first_quote",
+                  "await_update",
+                  "retry_later",
+                  "contact_operator"
+                ],
+                "title": "Next Action",
+                "type": "string"
+              },
+              "quote": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/QuoteValues"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reason": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reason"
+              },
+              "requested_max_age_ms": {
+                "title": "Requested Max Age Ms",
+                "type": "integer"
+              },
+              "retryable": {
+                "title": "Retryable",
+                "type": "boolean"
+              },
+              "source": {
+                "title": "Source",
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "ok",
+                  "no_data",
+                  "stale",
+                  "not_entitled",
+                  "provider_unavailable",
+                  "unknown_instrument"
+                ],
+                "title": "Status",
+                "type": "string"
+              },
+              "symbol": {
+                "title": "Symbol",
+                "type": "string"
+              }
+            },
+            "required": [
+              "status",
+              "symbol",
+              "feed",
+              "source",
+              "reason",
+              "market_data",
+              "requested_max_age_ms",
+              "last_observed_at",
+              "retryable",
+              "next_action",
+              "quote",
+              "last_quote"
+            ],
+            "title": "LatestQuote",
+            "type": "object"
+          },
+          "LatestQuotesData": {
+            "additionalProperties": false,
+            "description": "IEX results in request order; each item carries its own availability status.",
+            "properties": {
+              "quotes": {
+                "items": {
+                  "$ref": "#/$defs/LatestQuote"
+                },
+                "title": "Quotes",
+                "type": "array"
+              }
+            },
+            "required": [
+              "quotes"
+            ],
+            "title": "LatestQuotesData",
+            "type": "object"
+          },
+          "MarketDataProvenance": {
+            "additionalProperties": false,
+            "properties": {
+              "age_ms": {
+                "title": "Age Ms",
+                "type": "integer"
+              },
+              "coverage": {
+                "enum": [
+                  "single_exchange",
+                  "unverified"
+                ],
+                "title": "Coverage",
+                "type": "string"
+              },
+              "event_time": {
+                "format": "date-time",
+                "title": "Event Time",
+                "type": "string"
+              },
+              "feed": {
+                "enum": [
+                  "iex",
+                  "finnhub",
+                  "yahoo"
+                ],
+                "title": "Feed",
+                "type": "string"
+              },
+              "is_consolidated": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Is Consolidated"
+              },
+              "received_at": {
+                "format": "date-time",
+                "title": "Received At",
+                "type": "string"
+              },
+              "source": {
+                "title": "Source",
+                "type": "string"
+              }
+            },
+            "required": [
+              "source",
+              "feed",
+              "coverage",
+              "is_consolidated",
+              "event_time",
+              "received_at",
+              "age_ms"
+            ],
+            "title": "MarketDataProvenance",
+            "type": "object"
+          },
+          "QuoteValues": {
+            "additionalProperties": false,
+            "description": "A top-of-book quote. A zero price or size means that side is empty, not that it is free.",
+            "properties": {
+              "ask": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "title": "Ask"
+              },
+              "ask_exchange": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Ask Exchange"
+              },
+              "ask_size": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "title": "Ask Size"
+              },
+              "bid": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "title": "Bid"
+              },
+              "bid_exchange": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Bid Exchange"
+              },
+              "bid_size": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "title": "Bid Size"
+              },
+              "conditions": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Conditions",
+                "type": "array"
+              },
+              "currency": {
+                "const": "USD",
+                "default": "USD",
+                "title": "Currency",
+                "type": "string"
+              }
+            },
+            "required": [
+              "bid",
+              "ask",
+              "bid_size",
+              "ask_size",
+              "bid_exchange",
+              "ask_exchange",
+              "conditions"
+            ],
+            "title": "QuoteValues",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/LatestQuotesData"
+          },
+          "interface_version": {
+            "title": "Interface Version",
+            "type": "string"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "stram_data_version": {
+            "title": "Stram Data Version",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tool_version",
+          "stram_data_version",
+          "interface_version",
+          "policy_version",
+          "request_id",
+          "data"
+        ],
+        "title": "ToolEnvelope[LatestQuotesData]",
+        "type": "object"
+      },
+      "schemaHash": "1cbd4c85f4e5d9fd91064502f7cca8d03fbadc7e132f26de69851bee64d99ab0",
+      "scope": "quant:read"
     }
   ]
 }

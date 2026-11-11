@@ -2620,7 +2620,7 @@ wheels = [
 [[package]]
 name = "stram-data"
 version = "1.9.0"
-source = { git = "https://github.com/SiddarthaKoppaka/stram_data?rev=3059c1e1932a05dfbe8db4dd25b00b3a286d6fca#3059c1e1932a05dfbe8db4dd25b00b3a286d6fca" }
+source = { git = "https://github.com/SiddarthaKoppaka/stram_data?rev=65e9d7938bb9ef382a063b83d94d779b2a1f8f14#65e9d7938bb9ef382a063b83d94d779b2a1f8f14" }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "confluent-kafka" },
@@ -2675,7 +2675,7 @@ requires-dist = [
     { name = "opentelemetry-sdk", specifier = ">=1.45,<2" },
     { name = "pydantic", specifier = ">=2.10,<3" },
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.10,<3" },
-    { name = "stram-data", git = "https://github.com/SiddarthaKoppaka/stram_data?rev=3059c1e1932a05dfbe8db4dd25b00b3a286d6fca" },
+    { name = "stram-data", git = "https://github.com/SiddarthaKoppaka/stram_data?rev=65e9d7938bb9ef382a063b83d94d779b2a1f8f14" },
 ]
 
 [package.metadata.requires-dev]

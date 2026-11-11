@@ -38,7 +38,7 @@ def _contract() -> dict[str, dict[str, Any]]:
 
 def test_exactly_the_reviewed_tools_are_listed(parity: ParityClient) -> None:
     assert set(_listed_tools(parity)) == {spec.name for spec in TOOL_SPECS}
-    assert len(_listed_tools(parity)) == 10
+    assert len(_listed_tools(parity)) == 11
 
 
 @pytest.mark.parametrize("spec", TOOL_SPECS, ids=lambda spec: spec.name)

@@ -8,10 +8,17 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 
 import httpx
-from stram_data.data_interface import DataInterface
+from stram_data.data_interface import (
+    DataInterface,
+    LatestQuote,
+    MarketDataProvenance,
+    QuoteValues,
+)
 from stram_data.service.app import create_app
 from stram_data.service.auth import AuthenticationError, Caller
 
@@ -23,7 +30,7 @@ TOKEN_PATH = "/token"  # noqa: S105 - a URL path, not a secret
 TOKEN_URL = f"https://{IDP_HOST}{TOKEN_PATH}"
 GOOD_TOKEN_PREFIX = "service-token-"  # noqa: S105 - a test fixture value
 READ_SCOPES = frozenset(
-    {"series:read", "derived:read", "analytics:read", "catalog:read", "lineage:read"}
+    {"series:read", "derived:read", "analytics:read", "catalog:read", "lineage:read", "market:iex"}
 )
 HINDSIGHT = "hindsight:read"
 
@@ -73,7 +80,39 @@ class FakeDataPlane(httpx.AsyncBaseTransport):
                 return response
         if request.url.path == TOKEN_PATH:
             return self._token(request)
+        if request.url.path == "/v1/market/quotes" and request.method == "POST":
+            return self._latest_quotes(request)
         return await self._asgi.handle_async_request(request)
+
+    def _latest_quotes(self, request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        symbols = body.get("symbols", [])
+        now = datetime(2026, 11, 11, 15, 30, tzinfo=UTC)
+        quotes = tuple(
+            LatestQuote(
+                status="ok",
+                symbol=symbol,
+                feed="iex",
+                source="alpaca",
+                reason=None,
+                market_data=MarketDataProvenance(
+                    source="alpaca", feed="iex", coverage="single_exchange",
+                    is_consolidated=False, event_time=now, received_at=now, age_ms=0,
+                ),
+                requested_max_age_ms=body.get("max_age_ms", 15_000),
+                last_observed_at=now,
+                retryable=False,
+                next_action="none",
+                quote=QuoteValues(
+                    bid=Decimal("100.00"), ask=Decimal("100.02"), bid_size=Decimal("10"),
+                    ask_size=Decimal("12"), bid_exchange="V", ask_exchange="V", conditions=(),
+                ),
+                last_quote=None,
+            )
+            for symbol in symbols
+        )
+        content = json.dumps([quote.model_dump(mode="json") for quote in quotes])
+        return httpx.Response(200, content=content)
 
     def _token(self, request: httpx.Request) -> httpx.Response:
         form = dict(item.split("=", 1) for item in request.content.decode().split("&") if item)
