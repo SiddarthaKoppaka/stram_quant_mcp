@@ -40,6 +40,7 @@ TOKEN_REFRESH_MARGIN_SECONDS = 30.0
 DEFAULT_RETRY_AFTER_SECONDS = 5
 MAX_UPSTREAM_REASON_CHARS = 240
 HINDSIGHT_SCOPE = "hindsight:read"
+MARKET_IEX_SCOPE = "market:iex"
 TOKEN_REJECTED = frozenset({HTTPStatus.BAD_REQUEST, HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN})
 _SCOPE_PATTERN = re.compile(r"[a-z_]+:[a-z_<>]+")
 _PATH_PATTERN = re.compile(r"(?:[A-Za-z]:)?(?:/[\w.\-]+){2,}")

@@ -147,7 +147,7 @@ flowchart LR
 ```
 
 - **Canonical Data Plane (`stram_data` v1.3.1):** Owns all Parquet schemas, manifests, DuckDB execution, availability modes (`strict`, `estimated`, `ex_post`), revisions, lineage, and financial calculations.
-- **Authenticated MCP Tool Plane (`stram_quant_mcp`):** Exposes exactly 10 read-only tools with closed Pydantic schemas (`additionalProperties: false`), per-tool OAuth scope enforcement (`quant:discover`, `quant:read`, `quant:lineage`, `quant:analytics`), single-tenant admission (`tenant_id`), bounded single-worker concurrency, and tamper-evident HMAC audit logging.
+- **Authenticated MCP Tool Plane (`stram_quant_mcp`):** Exposes exactly 11 read-only tools with closed Pydantic schemas (`additionalProperties: false`), per-tool OAuth scope enforcement (`quant:discover`, `quant:read`, `quant:lineage`, `quant:analytics`), single-tenant admission (`tenant_id`), bounded single-worker concurrency, and tamper-evident HMAC audit logging.
 - **Local Staging IdP (Keycloak 26):** Runs in production `start --optimized` mode on an `--internal` Podman network under `stram-auth`. Issues 5-minute `RS256` tokens via confidential service accounts (`stram-quant-smoke` and `stram-quant-discovery-only`) with explicit audience (`oidc-audience-mapper`) and tenant (`oidc-hardcoded-claim-mapper`) mappers.
 
 ---

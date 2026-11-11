@@ -31,7 +31,7 @@ from stram_data.data_interface import (
     SeriesResult,
 )
 
-from stram_quant_mcp.data_client import HINDSIGHT_SCOPE, DataPlaneClient
+from stram_quant_mcp.data_client import HINDSIGHT_SCOPE, MARKET_IEX_SCOPE, DataPlaneClient
 from stram_quant_mcp.errors import ToolUpstreamError
 
 _CATALOG: Final = TypeAdapter(tuple[CatalogEntry, ...])
@@ -138,12 +138,23 @@ class DataGateway:
         self, query: MarketDataBatchQuery, *, deadline_seconds: float
     ) -> tuple[LatestQuote, ...]:
         """Read bounded IEX top-of-book results (POST /v1/market/quotes)."""
-        raw = await self._post("/v1/market/quotes", query, deadline_seconds)
+        raw = await self._post(
+            "/v1/market/quotes", query, deadline_seconds, extra_scope=MARKET_IEX_SCOPE
+        )
         return _parse(_LATEST_QUOTES, raw)
 
-    async def _post(self, path: str, query: BaseModel, deadline_seconds: float) -> bytes:
-        # Hindsight reads need an extra, separately requested scope; nothing else does.
-        scope = HINDSIGHT_SCOPE if getattr(query, "availability", None) == "ex_post" else None
+    async def _post(
+        self,
+        path: str,
+        query: BaseModel,
+        deadline_seconds: float,
+        *,
+        extra_scope: str | None = None,
+    ) -> bytes:
+        # The route-specific Data Plane entitlement is always requested explicitly.
+        scope = (
+            HINDSIGHT_SCOPE if getattr(query, "availability", None) == "ex_post" else extra_scope
+        )
         return await self._client.post_json(
             path,
             query.model_dump(mode="json"),

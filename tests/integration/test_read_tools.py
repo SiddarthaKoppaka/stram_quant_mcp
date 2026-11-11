@@ -19,7 +19,7 @@ from stram_quant_mcp.tool_models import (
 from tests.support.sync_adapter import SyncAdapter
 
 
-def test_all_eight_read_and_discovery_tools_use_the_real_interface(
+def test_all_read_and_discovery_tools_use_the_real_interface(
     tool_adapter: SyncAdapter,
 ) -> None:
     catalog = tool_adapter.execute("quant_list_series", {"limit": 20}, "catalog")
@@ -105,6 +105,16 @@ def test_all_eight_read_and_discovery_tools_use_the_real_interface(
     assert isinstance(latest, LatestQuotesEnvelope)
     assert [quote.symbol for quote in latest.data.quotes] == ["SPY", "AAPL"]
     assert all(quote.status == "ok" and quote.quote is not None for quote in latest.data.quotes)
+
+
+def test_latest_quotes_request_the_licensed_data_scope_and_real_route(
+    tool_adapter: SyncAdapter, data_plane
+) -> None:  # type: ignore[no-untyped-def]
+    latest = tool_adapter.execute("quant_get_latest_quotes", {"symbols": ["SPY"]}, "quotes")
+
+    assert isinstance(latest, LatestQuotesEnvelope)
+    assert [form.get("scope") for form in data_plane.token_requests] == ["market%3Aiex"]
+    assert len(data_plane.calls_to("/v1/market/quotes")) == 1
 
 
 def test_truncation_and_hindsight_are_explicit(tool_adapter: SyncAdapter) -> None:

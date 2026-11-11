@@ -183,6 +183,10 @@ class QuantToolAdapter:
             MarketDataBatchQuery(symbols=latest.symbols, max_age_ms=latest.max_age_ms),
             deadline_seconds=deadline,
         )
+        if tuple(quote.symbol for quote in quotes) != latest.symbols:
+            raise ToolUpstreamError(
+                "The Data Plane returned quote symbols that do not match the requested order."
+            )
         return LatestQuotesData(quotes=quotes)
 
 

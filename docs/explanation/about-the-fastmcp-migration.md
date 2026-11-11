@@ -41,7 +41,7 @@ framework. They stay as they are and are called from the new tool functions:
 - the HMAC-chained audit journal, including one terminal record per call;
 - the exact issuer, audience, tenant and expiry checks;
 - Host and Origin allowlists and the redaction rules for logs and telemetry;
-- the ten tool contracts: names, closed input and output schemas, scopes and schema hashes. A client
+- the eleven tool contracts: names, closed input and output schemas, scopes and schema hashes. A client
   must not be able to tell that the framework changed.
 
 ## Why a spike comes first

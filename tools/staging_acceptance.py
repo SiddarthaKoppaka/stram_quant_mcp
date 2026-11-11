@@ -267,7 +267,7 @@ async def _official_client(
         listed = await session.list_tools()
         if initialized.server_info.name != "stram-quant" or len(listed.tools) != 11:
             raise RuntimeError("official MCP initialization or exact eleven-tool contract failed")
-        _safe_status("official MCP initialize and list exactly 10 tools", "PASS")
+        _safe_status("official MCP initialize and list exactly 11 tools", "PASS")
         known = {tool.name for tool in listed.tools}
         for category, tool, arguments in calls:
             if tool not in known:

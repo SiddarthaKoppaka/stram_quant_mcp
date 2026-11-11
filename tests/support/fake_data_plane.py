@@ -16,6 +16,7 @@ import httpx
 from stram_data.data_interface import (
     DataInterface,
     LatestQuote,
+    MarketDataBatchQuery,
     MarketDataProvenance,
     QuoteValues,
 )
@@ -52,6 +53,13 @@ class _StubVerifier:
         return Caller(subject="quant-mcp", scopes=frozenset(scopes))
 
 
+class _SyntheticQuoteDataInterface(DataInterface):
+    """Use fixture-only stored quotes while exercising the real HTTP route and authorization."""
+
+    def get_latest_quotes(self, query: MarketDataBatchQuery) -> tuple[LatestQuote, ...]:
+        return _latest_quotes(query.symbols, query.max_age_ms)
+
+
 class FakeDataPlane(httpx.AsyncBaseTransport):
     """Routes the token endpoint and the Data Plane to in-process fakes, recording requests."""
 
@@ -64,7 +72,7 @@ class FakeDataPlane(httpx.AsyncBaseTransport):
         self.token_lifetime = 300
         self.overrides: list[Override] = []
         self._issued = 0
-        self._app = create_app(DataInterface(lake), _StubVerifier(self))  # type: ignore[arg-type]
+        self._app = create_app(_SyntheticQuoteDataInterface(lake), _StubVerifier(self))  # type: ignore[arg-type]
         self._asgi = httpx.ASGITransport(app=self._app)
 
     def script(self, override: Override) -> None:
@@ -80,47 +88,12 @@ class FakeDataPlane(httpx.AsyncBaseTransport):
                 return response
         if request.url.path == TOKEN_PATH:
             return self._token(request)
-        if request.url.path == "/v1/market/quotes" and request.method == "POST":
-            return self._latest_quotes(request)
         return await self._asgi.handle_async_request(request)
 
-    def _latest_quotes(self, request: httpx.Request) -> httpx.Response:
-        body = json.loads(request.content)
-        symbols = body.get("symbols", [])
-        now = datetime(2026, 11, 11, 15, 30, tzinfo=UTC)
-        quotes = tuple(
-            LatestQuote(
-                status="ok",
-                symbol=symbol,
-                feed="iex",
-                source="alpaca",
-                reason=None,
-                market_data=MarketDataProvenance(
-                    source="alpaca",
-                    feed="iex",
-                    coverage="single_exchange",
-                    is_consolidated=False,
-                    event_time=now,
-                    received_at=now,
-                    age_ms=0,
-                ),
-                requested_max_age_ms=body.get("max_age_ms", 15_000),
-                last_observed_at=now,
-                retryable=False,
-                next_action="none",
-                quote=QuoteValues(
-                    bid=Decimal("100.00"),
-                    ask=Decimal("100.02"),
-                    bid_size=Decimal("10"),
-                    ask_size=Decimal("12"),
-                    bid_exchange="V",
-                    ask_exchange="V",
-                    conditions=(),
-                ),
-                last_quote=None,
-            )
-            for symbol in symbols
-        )
+    def quote_response(self, symbols: tuple[str, ...], max_age_ms: int = 15_000) -> httpx.Response:
+        """Build a structurally valid quote response for a deliberate transport-level override."""
+
+        quotes = _latest_quotes(symbols, max_age_ms)
         content = json.dumps([quote.model_dump(mode="json") for quote in quotes])
         return httpx.Response(200, content=content)
 
@@ -138,6 +111,45 @@ class FakeDataPlane(httpx.AsyncBaseTransport):
         """The recorded requests whose URL path equals ``path``."""
 
         return [request for request in self.requests if request.url.path == path]
+
+
+def _latest_quotes(symbols: tuple[str, ...], max_age_ms: int) -> tuple[LatestQuote, ...]:
+    """Fixture rows representing stored IEX data for the Data Interface test double."""
+
+    now = datetime(2026, 11, 11, 15, 30, tzinfo=UTC)
+    return tuple(
+        LatestQuote(
+            status="ok",
+            symbol=symbol,
+            feed="iex",
+            source="alpaca",
+            reason=None,
+            market_data=MarketDataProvenance(
+                source="alpaca",
+                feed="iex",
+                coverage="single_exchange",
+                is_consolidated=False,
+                event_time=now,
+                received_at=now,
+                age_ms=0,
+            ),
+            requested_max_age_ms=max_age_ms,
+            last_observed_at=now,
+            retryable=False,
+            next_action="none",
+            quote=QuoteValues(
+                bid=Decimal("100.00"),
+                ask=Decimal("100.02"),
+                bid_size=Decimal("10"),
+                ask_size=Decimal("12"),
+                bid_exchange="V",
+                ask_exchange="V",
+                conditions=(),
+            ),
+            last_quote=None,
+        )
+        for symbol in symbols
+    )
 
 
 def problem(status: int, code: str, message: str, **headers: str) -> httpx.Response:

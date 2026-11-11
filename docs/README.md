@@ -28,7 +28,7 @@ so you can find what you need by asking what you are trying to do.
 ## Reference
 
 - [Integration handoff](reference/integration-handoff.md): for the STRAM API team: connect, authenticate, call, handle errors.
-- [Tools](reference/tools.md): contracts, scopes and errors for all ten tools.
+- [Tools](reference/tools.md): contracts, scopes and errors for all eleven tools.
 - [Configuration](reference/configuration.md): every environment variable.
 - [Security exceptions](reference/security-exceptions.md): reviewed, time-bounded exceptions.
 
