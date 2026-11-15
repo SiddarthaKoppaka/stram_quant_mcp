@@ -18,7 +18,7 @@ RUN sed -i \
 WORKDIR /build
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
-COPY vendor/stram_data-1.9.0-py3-none-any.whl /wheels/stram_data-1.9.0-py3-none-any.whl
+COPY vendor/stram_data-1.10.0-py3-none-any.whl /wheels/stram_data-1.10.0-py3-none-any.whl
 RUN uv export --frozen --no-dev --no-emit-project \
       --no-emit-package stram-data --no-emit-package confluent-kafka \
       --no-emit-package psycopg-binary \
@@ -27,9 +27,9 @@ RUN uv export --frozen --no-dev --no-emit-project \
     && uv pip install --python /opt/venv/bin/python \
       --requirements /tmp/runtime-requirements.txt \
     && uv pip install --python /opt/venv/bin/python --no-deps \
-      /wheels/stram_data-1.9.0-py3-none-any.whl . \
+      /wheels/stram_data-1.10.0-py3-none-any.whl . \
     && /opt/venv/bin/python -c \
-      'import stram_data; assert stram_data.__version__ == "1.9.0"'
+      'import stram_data; assert stram_data.__version__ == "1.10.0"'
 
 FROM ${PYTHON_BASE} AS runtime
 
