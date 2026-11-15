@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — company fundamentals
+
+- Adds `quant_get_fundamentals` (scope `quant:read`): reported company financials from SEC XBRL
+  filings through the Data Plane's `POST /v1/fundamentals`, as filed by an optional `as_of`. Twelve
+  tools now; the existing eleven are unchanged.
+- Pins `stram-data` 1.10.0 at `13cd0913fafcc31115bd7cab8b91fa3858d902d0` and requires Data Plane
+  service 1.10 or later; the Data Plane must be upgraded before this release starts.
+
 ## Unreleased — clean view
 
 - Adds an optional `view` input, `raw` (the default) or `clean`, to `quant_list_series`,

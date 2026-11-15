@@ -10,6 +10,7 @@ from stram_quant_mcp.tool_models import (
     CatalogEnvelope,
     DerivedEnvelope,
     FreshnessEnvelope,
+    FundamentalsEnvelope,
     IndicatorsEnvelope,
     IndicatorSubjectsEnvelope,
     LatestQuotesEnvelope,
@@ -100,6 +101,19 @@ def test_all_read_and_discovery_tools_use_the_real_interface(
     assert isinstance(lineage, LineageEnvelope)
     assert {item.series_key for item in lineage.data.inputs} == {"UST_10YEAR", "UST_2YEAR"}
     assert lineage.data.unresolved_input_ids == ()
+
+    fundamentals = tool_adapter.execute(
+        "quant_get_fundamentals", {"symbols": ["AAPL", "SPY"]}, "fundamentals"
+    )
+    assert isinstance(fundamentals, FundamentalsEnvelope)
+    apple, spy = fundamentals.data.companies
+    assert (apple.symbol, apple.pe_ttm, spy.symbol, spy.unavailable) == (
+        "AAPL",
+        Decimal("39.69"),
+        "SPY",
+        "not a tracked company with SEC filings",
+    )
+    assert [metric.metric for metric in apple.metrics] == ["revenue", "eps_diluted"]
 
     latest = tool_adapter.execute("quant_get_latest_quotes", {"symbols": ["SPY", "AAPL"]}, "quotes")
     assert isinstance(latest, LatestQuotesEnvelope)

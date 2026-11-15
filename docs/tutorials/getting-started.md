@@ -23,7 +23,7 @@ You should see `uv` resolve and install packages without errors.
 uv run python -c 'import stram_data; print(stram_data.__version__)'
 ```
 
-You should see `1.9.0`. At startup the server also checks the Data Plane service it connects to and refuses to start against an incompatible version.
+You should see `1.10.0`. At startup the server also checks the Data Plane service it connects to and refuses to start against an incompatible version.
 
 ## 3. Run the end-to-end test
 

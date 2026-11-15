@@ -16,7 +16,7 @@ Successful calls return structured content with this envelope:
 ```json
 {
   "tool_version": "0.1.0",
-  "stram_data_version": "1.9.0",
+  "stram_data_version": "1.10.0",
   "interface_version": "1",
   "policy_version": "availability-policy-hash",
   "request_id": "server-generated-id",
@@ -115,6 +115,21 @@ words.
   is descriptive and is not proof of completeness.
 
 ## Read tools
+
+### `quant_get_fundamentals`
+
+- Scope: `quant:read`
+- Data Interface: `get_fundamentals(FundamentalsQuery)` through `POST /v1/fundamentals` (Data Plane
+  scope `series:read`; service 1.10 or later).
+- Input: `symbols`, 1 to 10 distinct uppercase symbols; optional `as_of` (ISO date: only filings on or
+  before it count); optional `metrics`, a subset of `revenue`, `net_income`, `eps_diluted`,
+  `operating_cash_flow`, `total_assets`, `total_liabilities`, `shareholders_equity`, `cash`,
+  `shares_outstanding`.
+- Data: one company per requested symbol, in request order: each metric's taxonomy, concept and
+  unit, its latest fiscal year or balance and, for flows, trailing twelve months, each with period,
+  SEC accession numbers, filed date and method; the last IEX daily close and `pe_ttm` (US-GAAP
+  filers only); or `unavailable` with a reason. Values and calculations come from the Data Plane;
+  this service adds none.
 
 ### `quant_get_latest_quotes`
 

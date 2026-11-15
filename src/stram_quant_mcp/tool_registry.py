@@ -19,6 +19,8 @@ from stram_quant_mcp.tool_models import (
     DerivedInput,
     EmptyInput,
     FreshnessEnvelope,
+    FundamentalsEnvelope,
+    FundamentalsInput,
     IndicatorsEnvelope,
     IndicatorSubjectsEnvelope,
     IndicatorSubjectsInput,
@@ -151,6 +153,14 @@ TOOL_SPECS = (
         "quant:read",
         LatestQuotesInput,
         LatestQuotesEnvelope,
+        10.0,
+    ),
+    ToolSpec(
+        "quant_get_fundamentals",
+        TOOL_DOCS["quant_get_fundamentals"].render(),
+        "quant:read",
+        FundamentalsInput,
+        FundamentalsEnvelope,
         10.0,
     ),
 )

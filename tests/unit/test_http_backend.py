@@ -40,7 +40,7 @@ async def test_the_envelope_carries_the_data_plane_version_not_a_stale_constant(
 ) -> None:
     result = await _call(backend)
 
-    assert result["stram_data_version"] == "1.9.0"
+    assert result["stram_data_version"] == "1.10.0"
     assert result["interface_version"] == "1"
     assert result["policy_version"] == backend.policy_version
     assert result["request_id"] == "req-1"
