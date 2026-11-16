@@ -16,7 +16,7 @@ Successful calls return structured content with this envelope:
 ```json
 {
   "tool_version": "0.1.0",
-  "stram_data_version": "1.10.0",
+  "stram_data_version": "1.12.0",
   "interface_version": "1",
   "policy_version": "availability-policy-hash",
   "request_id": "server-generated-id",
@@ -130,6 +130,25 @@ words.
   SEC accession numbers, filed date and method; the last IEX daily close and `pe_ttm` (US-GAAP
   filers only); or `unavailable` with a reason. Values and calculations come from the Data Plane;
   this service adds none.
+
+### `quant_get_fundamental_ratios`
+
+- Scope: `quant:read`
+- Data Interface: `get_fundamental_ratios(FundamentalRatiosQuery)` through
+  `POST /v1/fundamentals/ratios` (Data Plane scope `series:read`; service 1.11 or later).
+- Input: `symbols`, 1 to 10 distinct uppercase symbols; optional `as_of` (ISO date: only filings on or
+  before it count); optional `groups`, a distinct subset of `growth`, `profitability`, `cash_flow`,
+  `liquidity`, `leverage`, `valuation` (empty: all six).
+- Data: one company per requested symbol, in request order. Each ratio has `value` (an exact decimal
+  string, or null), `group`, `basis`, `formula`, the `inputs` it used (each with its period, source
+  concept and any `caveat`) and a `note`. A ratio that cannot be worked out, or would mean nothing, is
+  null with the reason in `note`; it is never estimated, and null stays distinct from zero. Financial
+  companies get no margins or sales multiples, and valuation is only for US-GAAP filers reporting in
+  USD. Values and calculations come from the Data Plane; this service adds none.
+
+```json
+{"symbols":["AAPL"],"groups":["profitability","valuation"]}
+```
 
 ### `quant_get_latest_quotes`
 

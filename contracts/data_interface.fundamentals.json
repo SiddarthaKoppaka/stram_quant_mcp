@@ -1,7 +1,7 @@
 {
   "interface_version": "1",
-  "package_commit": "13cd0913fafcc31115bd7cab8b91fa3858d902d0",
-  "package_version": "1.10.0",
+  "package_commit": "2eaf9aef309e3be3ed6d575cbc84d7813b1ea6be",
+  "package_version": "1.12.0",
   "public_methods": [
     "describe_availability_policies",
     "get_aligned_panel",
@@ -9,7 +9,9 @@
     "get_conditional_returns",
     "get_derived",
     "get_freshness",
+    "get_fundamental_ratios",
     "get_fundamentals",
+    "get_insider_transactions",
     "get_latest_quote",
     "get_latest_quotes",
     "get_latest_trade",
@@ -38,6 +40,8 @@
     "DerivedResult",
     "FreshnessReport",
     "FundamentalMetric",
+    "FundamentalRatiosQuery",
+    "FundamentalRatiosResult",
     "FundamentalValue",
     "FundamentalsQuery",
     "FundamentalsResult",
@@ -51,6 +55,7 @@
     "PanelQuery",
     "PanelResult",
     "PolicyInfo",
+    "RatioGroup",
     "SeriesQuery",
     "SeriesResult"
   ]

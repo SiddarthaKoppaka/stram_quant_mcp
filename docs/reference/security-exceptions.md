@@ -4,7 +4,7 @@ Exceptions block release unless every field below remains current. They are not 
 
 ## PYSEC-2026-113 / CVE-2026-25087
 
-- **Dependency:** `pyarrow==22.0.0`, transitively constrained to `<23` by pinned `stram-data==1.10.0`
+- **Dependency:** `pyarrow==22.0.0`, transitively constrained to `<23` by pinned `stram-data==1.12.0`
 - **Severity:** high (CVSS 7.0)
 - **Owner:** Stram Quant MCP security/release owner
 - **Review date:** 2026-10-31

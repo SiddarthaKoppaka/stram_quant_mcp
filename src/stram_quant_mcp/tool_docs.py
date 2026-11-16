@@ -150,6 +150,21 @@ TOOL_DOCS: dict[str, ToolDocs] = {
         "their lineage.",
         ("resource_limit",),
     ),
+    "quant_get_fundamental_ratios": ToolDocs(
+        "Read ratios worked out from reported company financials: growth, profitability, cash "
+        "flow, liquidity, leverage and valuation.",
+        "a question needs margins, returns, free cash flow, leverage, growth or valuation "
+        "multiples, with the formula and inputs behind each.",
+        "raw reported figures (use quant_get_fundamentals), forecasts or advice; a ratio that "
+        "cannot be worked out is null with a reason in `note` and is never estimated. Financial "
+        "companies get no margins or sales multiples, and valuation is for US-GAAP filers in USD.",
+        "symbols (1-10 distinct uppercase symbols); as_of (optional ISO date: only filings on or "
+        "before it count); groups (optional subset of growth, profitability, cash_flow, "
+        "liquidity, leverage, valuation).",
+        "one company per symbol in request order: each ratio has its value (or null), formula, "
+        "basis, the inputs used with their periods and source concepts, and a note; or a reason "
+        "there is nothing.",
+    ),
     "quant_get_fundamentals": ToolDocs(
         "Read reported company financials from SEC XBRL filings, as filed by a date.",
         "a question needs revenue, net income, diluted EPS, operating cash flow, assets, "
