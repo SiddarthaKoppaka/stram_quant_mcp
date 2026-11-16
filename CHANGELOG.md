@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — identity providers that need the audience named
+
+- The Data Plane client can name the audience and scopes on every token request: the optional
+  `STRAM_MCP_DATA_RESOURCE` (the Data Plane audience, sent as `resource`) and `STRAM_MCP_DATA_SCOPES`
+  (space-separated base scopes, joined with a route's own extra scope). Logto issues a token only for a
+  named audience and scopes; Keycloak maps both from the client, which is why this was never needed.
+  Left unset, the request is byte-identical to before, so nothing changes until an operator sets them.
+
 ## Unreleased — fundamental ratios
 
 - Adds `quant_get_fundamental_ratios` (scope `quant:read`): growth, profitability, cash-flow,

@@ -323,3 +323,45 @@ async def test_an_unreachable_identity_provider_is_a_retryable_outage(
 
     with pytest.raises(errors.ToolUnavailableError):
         await _get(_client(data_plane, secret_file))
+
+
+@pytest.mark.asyncio
+async def test_a_provider_that_needs_the_audience_and_scopes_named_gets_them(  # type: ignore[no-untyped-def]
+    data_plane, secret_file
+) -> None:
+    client = _client(
+        data_plane,
+        secret_file,
+        resource="https://data.test/mcp",
+        base_scopes=("series:read", "catalog:read"),
+    )
+
+    await _get(client)
+    await client.post_json("/v1/market/quotes", {"symbols": ["SPY"]}, extra_scope="market:iex")
+
+    forms = data_plane.token_requests
+    assert forms[0]["resource"] == "https%3A%2F%2Fdata.test%2Fmcp"
+    assert forms[0]["scope"] == "series%3Aread+catalog%3Aread"
+    # the route's own scope joins the base scopes, each once
+    assert forms[1]["scope"] == "series%3Aread+catalog%3Aread+market%3Aiex"
+
+
+@pytest.mark.asyncio
+async def test_without_them_the_token_request_is_exactly_what_it_was(
+    data_plane, secret_file
+) -> None:  # type: ignore[no-untyped-def]
+    await _get(_client(data_plane, secret_file))
+
+    form = data_plane.token_requests[0]
+    assert "resource" not in form and "scope" not in form
+
+
+def test_a_base_scope_must_look_like_a_scope(secret_file) -> None:  # type: ignore[no-untyped-def]
+    with pytest.raises(ValueError, match="name:action"):
+        DataPlaneSettings(
+            base_url=DATA_URL,
+            token_url=TOKEN_URL,
+            client_id="c",
+            client_secret_path=secret_file,
+            base_scopes=("series read",),
+        )

@@ -18,6 +18,8 @@ class AppSettings(BaseModel):
     data_token_url: AnyHttpUrl
     data_client_id: str = Field(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9_.:\-]+$")
     data_client_secret_path: Path
+    data_resource: AnyHttpUrl | None = None
+    data_base_scopes: tuple[str, ...] = ()
     audit_db_path: Path
     audit_key_path: Path
     issuer_url: AnyHttpUrl
@@ -106,6 +108,8 @@ class AppSettings(BaseModel):
         values: dict[str, object] = {field: os.environ[env] for field, env in required.items()}
         values["allowed_hosts"] = _csv(str(values["allowed_hosts"]))
         values["allowed_origins"] = _csv(os.environ.get("STRAM_MCP_ALLOWED_ORIGINS", ""))
+        values["data_resource"] = os.environ.get("STRAM_MCP_DATA_RESOURCE") or None
+        values["data_base_scopes"] = tuple(os.environ.get("STRAM_MCP_DATA_SCOPES", "").split())
         values["allowed_algorithms"] = _csv(os.environ.get("STRAM_MCP_ALLOWED_ALGORITHMS", "RS256"))
         values["allow_insecure_http"] = os.environ.get("STRAM_MCP_ALLOW_INSECURE_HTTP") == "1"
         values["image_digest"] = os.environ.get("STRAM_MCP_IMAGE_DIGEST", "development")
