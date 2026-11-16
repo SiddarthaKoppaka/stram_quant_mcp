@@ -15,8 +15,12 @@ from pathlib import Path
 import httpx
 from stram_data.data_interface import (
     CompanyFundamentals,
+    CompanyRatios,
     DataInterface,
     FundamentalMetric,
+    FundamentalRatio,
+    FundamentalRatiosQuery,
+    FundamentalRatiosResult,
     FundamentalsQuery,
     FundamentalsResult,
     FundamentalValue,
@@ -24,6 +28,7 @@ from stram_data.data_interface import (
     MarketDataBatchQuery,
     MarketDataProvenance,
     QuoteValues,
+    RatioInput,
 )
 from stram_data.service.app import create_app
 from stram_data.service.auth import AuthenticationError, Caller
@@ -67,6 +72,9 @@ class _SyntheticQuoteDataInterface(DataInterface):
     def get_fundamentals(self, query: FundamentalsQuery) -> FundamentalsResult:
         return _fundamentals(query.symbols, query.as_of or date(2026, 11, 15))
 
+    def get_fundamental_ratios(self, query: FundamentalRatiosQuery) -> FundamentalRatiosResult:
+        return _ratios(query.symbols, query.as_of or date(2026, 11, 15), query.groups)
+
 
 class FakeDataPlane(httpx.AsyncBaseTransport):
     """Routes the token endpoint and the Data Plane to in-process fakes, recording requests."""
@@ -105,6 +113,13 @@ class FakeDataPlane(httpx.AsyncBaseTransport):
         content = json.dumps([quote.model_dump(mode="json") for quote in quotes])
         return httpx.Response(200, content=content)
 
+    def ratios_response(self, symbols: tuple[str, ...]) -> httpx.Response:
+        """A structurally valid /v1/fundamentals/ratios reply, for a transport-level override."""
+
+        return httpx.Response(
+            200, content=_ratios(symbols, date(2026, 11, 15), ()).model_dump_json()
+        )
+
     def _token(self, request: httpx.Request) -> httpx.Response:
         form = dict(item.split("=", 1) for item in request.content.decode().split("&") if item)
         self.token_requests.append(form)
@@ -119,6 +134,74 @@ class FakeDataPlane(httpx.AsyncBaseTransport):
         """The recorded requests whose URL path equals ``path``."""
 
         return [request for request in self.requests if request.url.path == path]
+
+
+# A ratio with many digits: it must reach the caller exactly, never through a float.
+EXACT_RATIO = Decimal("0.6086956521739130434782608696")
+
+
+def _ratios(
+    symbols: tuple[str, ...], as_of: date, groups: tuple[str, ...]
+) -> FundamentalRatiosResult:
+    """Fixture ratios: AAPL has one worked out and one null with its reason; others are unknown."""
+
+    margin_inputs = (
+        RatioInput(
+            name="gross_profit",
+            value=Decimal("700"),
+            period_end=date(2026, 6, 30),
+            source="derived",
+            caveat="gross profit is derived as revenue - cost_of_revenue (not reported)",
+        ),
+        RatioInput(
+            name="revenue",
+            value=Decimal("1150"),
+            period_end=date(2026, 6, 30),
+            source="us-gaap:Revenues",
+            caveat=None,
+        ),
+    )
+    ratios = (
+        FundamentalRatio(
+            name="gross_margin",
+            group="profitability",
+            value=EXACT_RATIO,
+            basis="ttm",
+            formula="gross_profit / revenue",
+            inputs=margin_inputs,
+            period_end=date(2026, 6, 30),
+            note=margin_inputs[0].caveat,
+        ),
+        FundamentalRatio(
+            name="current_ratio",
+            group="liquidity",
+            value=None,
+            basis="latest_balance",
+            formula="current_assets / current_liabilities",
+            inputs=(),
+            period_end=None,
+            note="missing: current_assets, current_liabilities",
+        ),
+    )
+    kept = tuple(ratio for ratio in ratios if not groups or ratio.group in groups)
+
+    def company(symbol: str) -> CompanyRatios:
+        known = symbol == "AAPL"
+        return CompanyRatios(
+            symbol=symbol,
+            cik="0000320193" if known else None,
+            name="Apple Inc." if known else None,
+            price=None,
+            price_date=None,
+            ratios=kept if known else (),
+            unavailable=None if known else "not a tracked company with SEC filings",
+        )
+
+    return FundamentalRatiosResult(
+        as_of=as_of,
+        companies=tuple(company(symbol) for symbol in symbols),
+        availability_note="Ratios are worked out from reported XBRL facts.",
+    )
 
 
 def _fundamentals(symbols: tuple[str, ...], as_of: date) -> FundamentalsResult:

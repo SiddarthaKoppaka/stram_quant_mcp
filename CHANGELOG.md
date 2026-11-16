@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — fundamental ratios
+
+- Adds `quant_get_fundamental_ratios` (scope `quant:read`): growth, profitability, cash-flow,
+  liquidity, leverage and valuation ratios, each with its formula, the inputs it used and a note,
+  through the Data Plane's `POST /v1/fundamentals/ratios`. Thirteen tools now; the existing twelve
+  are unchanged (their schemas and hashes are byte-identical).
+- Moves the `stram-data` pin to 1.12.0 at `2eaf9aef309e3be3ed6d575cbc84d7813b1ea6be` and requires
+  Data Plane service 1.11 or later; the Data Plane must be upgraded before this release starts.
+
 ## Unreleased — company fundamentals
 
 - Adds `quant_get_fundamentals` (scope `quant:read`): reported company financials from SEC XBRL

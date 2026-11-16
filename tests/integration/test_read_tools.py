@@ -10,6 +10,7 @@ from stram_quant_mcp.tool_models import (
     CatalogEnvelope,
     DerivedEnvelope,
     FreshnessEnvelope,
+    FundamentalRatiosEnvelope,
     FundamentalsEnvelope,
     IndicatorsEnvelope,
     IndicatorSubjectsEnvelope,
@@ -17,6 +18,7 @@ from stram_quant_mcp.tool_models import (
     LineageEnvelope,
     SeriesEnvelope,
 )
+from tests.support.fake_data_plane import EXACT_RATIO
 from tests.support.sync_adapter import SyncAdapter
 
 
@@ -238,3 +240,51 @@ def test_unknown_entities_and_tools_have_stable_errors(tool_adapter: SyncAdapter
         )
     with pytest.raises(ToolInputError):
         tool_adapter.execute("not_a_tool", {}, "unknown")
+
+
+def test_ratios_keep_their_exact_decimals_formulas_and_reasons(
+    tool_adapter: SyncAdapter, data_plane
+) -> None:  # type: ignore[no-untyped-def]
+    result = tool_adapter.execute(
+        "quant_get_fundamental_ratios", {"symbols": ["AAPL", "SPY"]}, "ratios"
+    )
+
+    assert isinstance(result, FundamentalRatiosEnvelope)
+    apple, spy = result.data.companies
+    ratios = {ratio.name: ratio for ratio in apple.ratios}
+    assert ratios["gross_margin"].value == EXACT_RATIO  # every digit, never a float
+    assert ratios["gross_margin"].formula == "gross_profit / revenue"
+    assert ratios["gross_margin"].inputs[0].caveat is not None
+    assert ratios["current_ratio"].value is None  # missing stays distinct from zero
+    assert ratios["current_ratio"].note == "missing: current_assets, current_liabilities"
+    assert spy.unavailable == "not a tracked company with SEC filings" and spy.ratios == ()
+    assert len(data_plane.calls_to("/v1/fundamentals/ratios")) == 1
+
+
+def test_ratio_groups_narrow_the_request(tool_adapter: SyncAdapter) -> None:
+    result = tool_adapter.execute(
+        "quant_get_fundamental_ratios", {"symbols": ["AAPL"], "groups": ["liquidity"]}, "groups"
+    )
+
+    assert isinstance(result, FundamentalRatiosEnvelope)
+    assert [ratio.group for ratio in result.data.companies[0].ratios] == ["liquidity"]
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {"symbols": ["AAPL", "AAPL"]},
+        {"symbols": ["AAPL"], "groups": ["growth", "growth"]},
+        {"symbols": ["AAPL"], "groups": ["vibes"]},
+        {"symbols": ["aapl"]},
+        {"symbols": []},
+        {"symbols": [f"S{i}" for i in range(11)]},
+        {"symbols": ["AAPL"], "as_of": "not a date"},
+        {"symbols": ["AAPL"], "sql": "select 1"},
+    ],
+)
+def test_ratio_inputs_are_closed_and_bounded(
+    tool_adapter: SyncAdapter, arguments: dict[str, object]
+) -> None:
+    with pytest.raises(ToolInputError):
+        tool_adapter.execute("quant_get_fundamental_ratios", arguments, "bad")

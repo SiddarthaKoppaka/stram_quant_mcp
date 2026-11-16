@@ -5486,6 +5486,381 @@
       },
       "schemaHash": "28ef0382a67438fbd406b2a4a424420f54fbc4e08e70b8ac6e019b7986199524",
       "scope": "quant:read"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Read ratios worked out from reported company financials: growth, profitability, cash flow, liquidity, leverage and valuation.\n\nUse when: a question needs margins, returns, free cash flow, leverage, growth or valuation multiples, with the formula and inputs behind each.\nDo not use for: raw reported figures (use quant_get_fundamentals), forecasts or advice; a ratio that cannot be worked out is null with a reason in `note` and is never estimated. Financial companies get no margins or sales multiples, and valuation is for US-GAAP filers in USD.\nInputs: symbols (1-10 distinct uppercase symbols); as_of (optional ISO date: only filings on or before it count); groups (optional subset of growth, profitability, cash_flow, liquidity, leverage, valuation).\nReturns: one company per symbol in request order: each ratio has its value (or null), formula, basis, the inputs used with their periods and source concepts, and a note; or a reason there is nothing.\nRead-only and idempotent; safe to call again.\n\nFailures return isError=true and _meta['io.stram/error'] with code, category, retryable, reason and next_action:\n- invalid_request: an argument is wrong; the reason names the field. Fix it. Not retryable.\n- access_denied: the token lacks this tool's scope. Not retryable; ask the administrator.\n- unavailable: the Data Plane is down or paused. Retryable with backoff; honour retry_after_seconds.\n- overloaded: capacity or rate limit reached. Retryable after retry_after_seconds.\n- deadline_exceeded: too slow. Retry once with a narrower range or fewer series.\n- data_plane_error, service_credentials_rejected, data_plane_forbidden: a server-side fault. Not retryable; report the request_id.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "Ratios worked out from reported company financials, for a few symbols.",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "As Of"
+          },
+          "groups": {
+            "default": [],
+            "items": {
+              "enum": [
+                "growth",
+                "profitability",
+                "cash_flow",
+                "liquidity",
+                "leverage",
+                "valuation"
+              ],
+              "type": "string"
+            },
+            "maxItems": 6,
+            "title": "Groups",
+            "type": "array"
+          },
+          "symbols": {
+            "items": {
+              "maxLength": 20,
+              "minLength": 1,
+              "pattern": "^[A-Z0-9./-]+$",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "symbols"
+        ],
+        "title": "FundamentalRatiosInput",
+        "type": "object"
+      },
+      "name": "quant_get_fundamental_ratios",
+      "outputSchema": {
+        "$defs": {
+          "CompanyRatios": {
+            "additionalProperties": false,
+            "properties": {
+              "cik": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Cik"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "price": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Price"
+              },
+              "price_date": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Price Date"
+              },
+              "ratios": {
+                "items": {
+                  "$ref": "#/$defs/FundamentalRatio"
+                },
+                "title": "Ratios",
+                "type": "array"
+              },
+              "symbol": {
+                "title": "Symbol",
+                "type": "string"
+              },
+              "unavailable": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Unavailable"
+              }
+            },
+            "required": [
+              "symbol",
+              "cik",
+              "name",
+              "price",
+              "price_date",
+              "ratios",
+              "unavailable"
+            ],
+            "title": "CompanyRatios",
+            "type": "object"
+          },
+          "FundamentalRatio": {
+            "additionalProperties": false,
+            "properties": {
+              "basis": {
+                "enum": [
+                  "ttm",
+                  "annual",
+                  "latest_balance",
+                  "mixed"
+                ],
+                "title": "Basis",
+                "type": "string"
+              },
+              "formula": {
+                "title": "Formula",
+                "type": "string"
+              },
+              "group": {
+                "enum": [
+                  "growth",
+                  "profitability",
+                  "cash_flow",
+                  "liquidity",
+                  "leverage",
+                  "valuation"
+                ],
+                "title": "Group",
+                "type": "string"
+              },
+              "inputs": {
+                "items": {
+                  "$ref": "#/$defs/RatioInput"
+                },
+                "title": "Inputs",
+                "type": "array"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Note"
+              },
+              "period_end": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Period End"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Value"
+              }
+            },
+            "required": [
+              "name",
+              "group",
+              "value",
+              "basis",
+              "formula",
+              "inputs",
+              "period_end",
+              "note"
+            ],
+            "title": "FundamentalRatio",
+            "type": "object"
+          },
+          "FundamentalRatiosData": {
+            "additionalProperties": false,
+            "description": "One result per requested symbol, in request order, with the Data Plane's note.",
+            "properties": {
+              "as_of": {
+                "format": "date",
+                "title": "As Of",
+                "type": "string"
+              },
+              "availability_note": {
+                "title": "Availability Note",
+                "type": "string"
+              },
+              "companies": {
+                "items": {
+                  "$ref": "#/$defs/CompanyRatios"
+                },
+                "title": "Companies",
+                "type": "array"
+              }
+            },
+            "required": [
+              "as_of",
+              "companies",
+              "availability_note"
+            ],
+            "title": "FundamentalRatiosData",
+            "type": "object"
+          },
+          "RatioInput": {
+            "additionalProperties": false,
+            "properties": {
+              "caveat": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Caveat"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "period_end": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Period End"
+              },
+              "source": {
+                "title": "Source",
+                "type": "string"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "title": "Value"
+              }
+            },
+            "required": [
+              "name",
+              "value",
+              "period_end",
+              "source",
+              "caveat"
+            ],
+            "title": "RatioInput",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/FundamentalRatiosData"
+          },
+          "interface_version": {
+            "title": "Interface Version",
+            "type": "string"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "stram_data_version": {
+            "title": "Stram Data Version",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tool_version",
+          "stram_data_version",
+          "interface_version",
+          "policy_version",
+          "request_id",
+          "data"
+        ],
+        "title": "ToolEnvelope[FundamentalRatiosData]",
+        "type": "object"
+      },
+      "schemaHash": "a11d0031d3981e33248ff34fe40f7781979a3c1b97a6156a3539563a4080b4de",
+      "scope": "quant:read"
     }
   ]
 }
