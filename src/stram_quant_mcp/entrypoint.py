@@ -75,6 +75,8 @@ async def data_plane_probe() -> None:
             token_url=settings.data_token_url,
             client_id=settings.data_client_id,
             client_secret_path=settings.data_client_secret_path,
+            resource=settings.data_resource,
+            base_scopes=settings.data_base_scopes,
             connect_timeout_seconds=settings.data_connect_timeout_seconds,
             max_response_bytes=settings.max_response_bytes,
             allow_insecure_http=settings.allow_insecure_http,

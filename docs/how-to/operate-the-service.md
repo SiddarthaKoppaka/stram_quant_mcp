@@ -53,6 +53,7 @@ Required service variables are:
 | `STRAM_MCP_DATA_URL` | Data Plane service base URL (HTTPS outside loopback tests) |
 | `STRAM_MCP_DATA_TOKEN_URL` | Keycloak token endpoint for this service's `client_credentials` token |
 | `STRAM_MCP_DATA_CLIENT_ID` | This service's Keycloak client id |
+| `STRAM_MCP_DATA_RESOURCE`, `STRAM_MCP_DATA_SCOPES` | Optional. The Data Plane audience and base scopes, sent on each token request, for a provider that needs them named (Logto). Unset keeps the Keycloak request unchanged |
 | `STRAM_MCP_DATA_CLIENT_SECRET_FILE` | Read-only mounted client secret file, never an environment value |
 | `STRAM_MCP_AUDIT_DB` | SQLite audit journal, on the writable audit volume |
 | `STRAM_MCP_AUDIT_KEY_FILE` | Separate read-only HMAC key file, minimum 32 bytes |

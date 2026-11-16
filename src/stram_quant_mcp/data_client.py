@@ -22,7 +22,7 @@ from http import HTTPStatus
 from pathlib import Path
 
 import httpx
-from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
+from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, field_validator
 
 from stram_quant_mcp.errors import (
     QuantToolError,
@@ -60,6 +60,18 @@ class DataPlaneSettings(BaseModel):
     read_timeout_seconds: float = Field(default=20.0, gt=0, le=120)
     max_response_bytes: int = Field(default=4 * 1024 * 1024, ge=1024, le=16 * 1024 * 1024)
     allow_insecure_http: bool = False
+    # Providers that issue a token only for a named audience and named scopes (Logto) need both on
+    # every token request. Left unset, the request is unchanged and the provider's defaults apply
+    # (Keycloak maps the audience and default scopes from the client's configuration).
+    resource: AnyHttpUrl | None = None
+    base_scopes: tuple[str, ...] = Field(default=(), max_length=32)
+
+    @field_validator("base_scopes")
+    @classmethod
+    def _scopes_are_plain(cls, scopes: tuple[str, ...]) -> tuple[str, ...]:
+        if any(not _SCOPE_PATTERN.fullmatch(scope) for scope in scopes):
+            raise ValueError("data scopes must look like name:action")
+        return scopes
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,6 +124,20 @@ class TokenProvider:
         """Drop a token the Data Plane rejected so the next call fetches a new one."""
         self._tokens.pop(extra_scope, None)
 
+    def _token_form(self, secret: str, extra_scope: str | None) -> dict[str, str]:
+        """The client-credentials request. The audience and scopes are sent only when configured."""
+        form = {
+            "grant_type": "client_credentials",
+            "client_id": self._settings.client_id,
+            "client_secret": secret,
+        }
+        scopes = (*self._settings.base_scopes, *([extra_scope] if extra_scope else []))
+        if scopes:
+            form["scope"] = " ".join(dict.fromkeys(scopes))
+        if self._settings.resource is not None:
+            form["resource"] = str(self._settings.resource)
+        return form
+
     async def _fetch(self, extra_scope: str | None) -> _CachedToken:
         try:
             secret = self._settings.client_secret_path.read_text().strip()
@@ -122,13 +148,7 @@ class TokenProvider:
             ) from None
         if not secret:
             raise ToolCredentialsError("The Data Plane client secret file is empty.") from None
-        form = {
-            "grant_type": "client_credentials",
-            "client_id": self._settings.client_id,
-            "client_secret": secret,
-        }
-        if extra_scope:
-            form["scope"] = extra_scope
+        form = self._token_form(secret, extra_scope)
         try:
             response = await self._http.post(
                 str(self._settings.token_url),
