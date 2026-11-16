@@ -107,6 +107,7 @@ async def test_every_successful_envelope_round_trips_its_declared_output_model(
             "horizons": [1],
         },
         "quant_get_latest_quotes": {"symbols": ["SPY"]},
+        "quant_get_fundamentals": {"symbols": ["AAPL"]},
     }
     if tool == "quant_get_lineage":
         derived = await backend.call("quant_get_derived", examples["quant_get_derived"], "seed", 5)

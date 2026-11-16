@@ -13,8 +13,8 @@ staging or production access and must not be run without separate authorization.
 - For a long-running authenticated server, an OAuth/OIDC issuer that provides asymmetric JWTs and a
   reachable JWKS endpoint. Local automated integration generates an ephemeral test identity instead.
 
-The exact runtime dependency is `stram-data` 1.9.0 at Git commit
-`65e9d7938bb9ef382a063b83d94d779b2a1f8f14`, used for typed models only; `uv.lock` is authoritative.
+The exact runtime dependency is `stram-data` 1.10.0 at Git commit
+`13cd0913fafcc31115bd7cab8b91fa3858d902d0`, used for typed models only; `uv.lock` is authoritative.
 
 ## Local development
 
@@ -22,7 +22,7 @@ From the repository root:
 
 ```bash
 uv sync --frozen --dev
-uv run python -c 'import stram_data; assert stram_data.__version__ == "1.9.0"'
+uv run python -c 'import stram_data; assert stram_data.__version__ == "1.10.0"'
 uv run python -m stram_quant_mcp.tools.export_schema --check
 ```
 

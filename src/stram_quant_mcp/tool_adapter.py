@@ -13,6 +13,7 @@ from stram_data.data_interface import (
     ConditionalReturnsResult,
     DerivedQuery,
     DerivedResult,
+    FundamentalsQuery,
     MarketDataBatchQuery,
     PanelColumn,
     PanelQuery,
@@ -37,6 +38,8 @@ from stram_quant_mcp.tool_models import (
     CatalogInput,
     ConditionalReturnsInput,
     DerivedInput,
+    FundamentalsData,
+    FundamentalsInput,
     IndicatorsData,
     IndicatorSubjectsData,
     IndicatorSubjectsInput,
@@ -129,6 +132,7 @@ class QuantToolAdapter:
             "quant_get_aligned_panel": self._panel,
             "quant_get_conditional_returns": self._conditional_returns,
             "quant_get_latest_quotes": self._latest_quotes,
+            "quant_get_fundamentals": self._fundamentals,
         }
 
     async def _catalog(self, request: BaseModel, deadline: float) -> BaseModel:
@@ -176,6 +180,22 @@ class QuantToolAdapter:
     async def _conditional_returns(self, request: BaseModel, deadline: float) -> BaseModel:
         query = _conditional_query(cast(ConditionalReturnsInput, request))
         return await self._gateway.get_conditional_returns(query, deadline_seconds=deadline)
+
+    async def _fundamentals(self, request: BaseModel, deadline: float) -> BaseModel:
+        wanted = cast(FundamentalsInput, request)
+        result = await self._gateway.get_fundamentals(
+            FundamentalsQuery(symbols=wanted.symbols, as_of=wanted.as_of, metrics=wanted.metrics),
+            deadline_seconds=deadline,
+        )
+        if tuple(company.symbol for company in result.companies) != wanted.symbols:
+            raise ToolUpstreamError(
+                "The Data Plane returned companies that do not match the requested order."
+            )
+        return FundamentalsData(
+            as_of=result.as_of,
+            companies=result.companies,
+            availability_note=result.availability_note,
+        )
 
     async def _latest_quotes(self, request: BaseModel, deadline: float) -> BaseModel:
         latest = cast(LatestQuotesInput, request)

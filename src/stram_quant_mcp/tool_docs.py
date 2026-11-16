@@ -150,6 +150,20 @@ TOOL_DOCS: dict[str, ToolDocs] = {
         "their lineage.",
         ("resource_limit",),
     ),
+    "quant_get_fundamentals": ToolDocs(
+        "Read reported company financials from SEC XBRL filings, as filed by a date.",
+        "a question needs revenue, net income, diluted EPS, operating cash flow, assets, "
+        "liabilities, equity, cash, shares outstanding or a trailing P/E for a listed company.",
+        "prices, estimates, forecasts or ratings; values are as reported, and P/E is given only "
+        "for US-GAAP filers.",
+        "symbols (1-10 distinct uppercase symbols); as_of (optional ISO date: only filings on or "
+        "before it count); metrics (optional subset of revenue, net_income, eps_diluted, "
+        "operating_cash_flow, total_assets, total_liabilities, shareholders_equity, cash, "
+        "shares_outstanding).",
+        "one company per symbol in request order: each metric's latest fiscal year or balance and, "
+        "for flows, trailing twelve months, with period, SEC accession numbers and filed date; "
+        "the last close and pe_ttm; or a reason there is nothing.",
+    ),
     "quant_get_latest_quotes": ToolDocs(
         "Read the latest stored Alpaca IEX top-of-book quotes for a bounded symbol set.",
         "a screen or analysis needs fresh IEX bid and ask data with its exact event time and "

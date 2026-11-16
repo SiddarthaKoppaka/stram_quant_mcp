@@ -8,13 +8,18 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 
 import httpx
 from stram_data.data_interface import (
+    CompanyFundamentals,
     DataInterface,
+    FundamentalMetric,
+    FundamentalsQuery,
+    FundamentalsResult,
+    FundamentalValue,
     LatestQuote,
     MarketDataBatchQuery,
     MarketDataProvenance,
@@ -58,6 +63,9 @@ class _SyntheticQuoteDataInterface(DataInterface):
 
     def get_latest_quotes(self, query: MarketDataBatchQuery) -> tuple[LatestQuote, ...]:
         return _latest_quotes(query.symbols, query.max_age_ms)
+
+    def get_fundamentals(self, query: FundamentalsQuery) -> FundamentalsResult:
+        return _fundamentals(query.symbols, query.as_of or date(2026, 11, 15))
 
 
 class FakeDataPlane(httpx.AsyncBaseTransport):
@@ -111,6 +119,67 @@ class FakeDataPlane(httpx.AsyncBaseTransport):
         """The recorded requests whose URL path equals ``path``."""
 
         return [request for request in self.requests if request.url.path == path]
+
+
+def _fundamentals(symbols: tuple[str, ...], as_of: date) -> FundamentalsResult:
+    """Fixture fundamentals: AAPL's FY2026 revenue and EPS; any other symbol is unknown."""
+
+    def value(amount: str) -> FundamentalValue:
+        return FundamentalValue(
+            value=Decimal(amount),
+            period_start=date(2025, 9, 28),
+            period_end=date(2026, 9, 26),
+            accessions=("0000320193-26-000026",),
+            filed=date(2026, 11, 3),
+            method="reported",
+        )
+
+    def company(symbol: str) -> CompanyFundamentals:
+        if symbol != "AAPL":
+            return CompanyFundamentals(
+                symbol=symbol,
+                cik=None,
+                name=None,
+                metrics=(),
+                price=None,
+                price_date=None,
+                pe_ttm=None,
+                unavailable="not a tracked company with SEC filings",
+            )
+        metrics = (
+            FundamentalMetric(
+                metric="revenue",
+                taxonomy="us-gaap",
+                concept="RevenueFromContractWithCustomerExcludingAssessedTax",
+                unit="USD",
+                latest=value("478834000000"),
+                ttm=value("478834000000"),
+            ),
+            FundamentalMetric(
+                metric="eps_diluted",
+                taxonomy="us-gaap",
+                concept="EarningsPerShareDiluted",
+                unit="USD/shares",
+                latest=value("8.98"),
+                ttm=value("8.98"),
+            ),
+        )
+        return CompanyFundamentals(
+            symbol=symbol,
+            cik="0000320193",
+            name="Apple Inc.",
+            metrics=metrics,
+            price=Decimal("356.40"),
+            price_date=date(2026, 11, 13),
+            pe_ttm=Decimal("39.69"),
+            unavailable=None,
+        )
+
+    return FundamentalsResult(
+        as_of=as_of,
+        companies=tuple(company(symbol) for symbol in symbols),
+        availability_note="Values are as reported to the SEC in XBRL.",
+    )
 
 
 def _latest_quotes(symbols: tuple[str, ...], max_age_ms: int) -> tuple[LatestQuote, ...]:

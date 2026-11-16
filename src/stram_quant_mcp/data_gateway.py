@@ -20,6 +20,8 @@ from stram_data.data_interface import (
     DerivedQuery,
     DerivedResult,
     FreshnessReport,
+    FundamentalsQuery,
+    FundamentalsResult,
     IndicatorInfo,
     LatestQuote,
     LineageResult,
@@ -39,6 +41,7 @@ _INDICATORS: Final = TypeAdapter(tuple[IndicatorInfo, ...])
 _POLICIES: Final = TypeAdapter(tuple[PolicyInfo, ...])
 _SUBJECTS: Final = TypeAdapter(tuple[str, ...])
 _LATEST_QUOTES: Final = TypeAdapter(tuple[LatestQuote, ...])
+_FUNDAMENTALS: Final = TypeAdapter(FundamentalsResult)
 _INTERFACE_PATTERN: Final = re.compile(r"Data Interface v(\d+)")
 _VERSION_PATTERN: Final = re.compile(r"^(\d+)\.(\d+)\.(\d+)")
 MAX_REPORTED_FIELDS: Final = 3
@@ -142,6 +145,13 @@ class DataGateway:
             "/v1/market/quotes", query, deadline_seconds, extra_scope=MARKET_IEX_SCOPE
         )
         return _parse(_LATEST_QUOTES, raw)
+
+    async def get_fundamentals(
+        self, query: FundamentalsQuery, *, deadline_seconds: float
+    ) -> FundamentalsResult:
+        """Read reported company financials as filed by a date (POST /v1/fundamentals)."""
+        raw = await self._post("/v1/fundamentals", query, deadline_seconds)
+        return _parse(_FUNDAMENTALS, raw)
 
     async def _post(
         self,

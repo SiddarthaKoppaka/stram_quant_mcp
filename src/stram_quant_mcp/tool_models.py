@@ -10,9 +10,11 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, StringConstraints,
 from stram_data.data_interface import (
     AvailabilitySummary,
     CatalogEntry,
+    CompanyFundamentals,
     ConditionalReturnsResult,
     DerivedResult,
     FreshnessReport,
+    FundamentalMetricName,
     IndicatorInfo,
     LatestQuote,
     LineageResult,
@@ -207,6 +209,28 @@ class LatestQuotesInput(ContractModel):
         if len(set(self.symbols)) != len(self.symbols):
             raise ValueError("symbols must not contain duplicates")
         return self
+
+
+class FundamentalsInput(ContractModel):
+    """Reported company financials for a few symbols, as filed by a date."""
+
+    symbols: tuple[MarketSymbol, ...] = Field(min_length=1, max_length=10)
+    as_of: date | None = None
+    metrics: tuple[FundamentalMetricName, ...] = ()
+
+    @model_validator(mode="after")
+    def validate_symbols(self) -> FundamentalsInput:
+        if len(set(self.symbols)) != len(self.symbols):
+            raise ValueError("symbols must not contain duplicates")
+        return self
+
+
+class FundamentalsData(ContractModel):
+    """One result per requested symbol, in request order, with the Data Plane's note."""
+
+    as_of: date
+    companies: tuple[CompanyFundamentals, ...]
+    availability_note: str
 
 
 class CatalogData(ContractModel):
@@ -408,3 +432,4 @@ LineageEnvelope = ToolEnvelope[LineageResult]
 PanelEnvelope = ToolEnvelope[PanelResult | CleanPanelData]
 ConditionalReturnsEnvelope = ToolEnvelope[ConditionalReturnsResult | CleanConditionalReturnsData]
 LatestQuotesEnvelope = ToolEnvelope[LatestQuotesData]
+FundamentalsEnvelope = ToolEnvelope[FundamentalsData]
