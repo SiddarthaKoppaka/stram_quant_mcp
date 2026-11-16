@@ -62,6 +62,26 @@ async def test_latest_quotes_rejects_reordered_data_plane_rows(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("tool", "path", "respond"),
+    [
+        ("quant_get_fundamentals", "/v1/fundamentals", "fundamentals_response"),
+        ("quant_get_fundamental_ratios", "/v1/fundamentals/ratios", "ratios_response"),
+    ],
+)
+async def test_fundamentals_reject_reordered_or_substituted_data_plane_companies(
+    backend: HttpDataBackend, data_plane: FakeDataPlane, tool: str, path: str, respond: str
+) -> None:
+    build = getattr(data_plane, respond)
+    data_plane.script(lambda request: build(("MSFT", "AAPL")) if request.url.path == path else None)
+
+    with pytest.raises(errors.ToolUpstreamError) as raised:
+        await backend.call(tool, {"symbols": ["AAPL", "MSFT"]}, "req-1", 5.0)
+
+    assert "requested order" in raised.value.reason
+
+
+@pytest.mark.asyncio
 async def test_unknown_tools_and_extra_arguments_never_reach_the_data_plane(
     backend: HttpDataBackend, data_plane: FakeDataPlane
 ) -> None:
@@ -107,6 +127,8 @@ async def test_every_successful_envelope_round_trips_its_declared_output_model(
             "horizons": [1],
         },
         "quant_get_latest_quotes": {"symbols": ["SPY"]},
+        "quant_get_fundamentals": {"symbols": ["AAPL", "ZZZZ"]},
+        "quant_get_fundamental_ratios": {"symbols": ["AAPL", "ZZZZ"]},
     }
     if tool == "quant_get_lineage":
         derived = await backend.call("quant_get_derived", examples["quant_get_derived"], "seed", 5)

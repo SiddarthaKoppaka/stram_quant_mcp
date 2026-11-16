@@ -10,12 +10,15 @@ from stram_quant_mcp.tool_models import (
     CatalogEnvelope,
     DerivedEnvelope,
     FreshnessEnvelope,
+    FundamentalRatiosEnvelope,
+    FundamentalsEnvelope,
     IndicatorsEnvelope,
     IndicatorSubjectsEnvelope,
     LatestQuotesEnvelope,
     LineageEnvelope,
     SeriesEnvelope,
 )
+from tests.support.fake_data_plane import EXACT_RATIO
 from tests.support.sync_adapter import SyncAdapter
 
 
@@ -224,3 +227,66 @@ def test_unknown_entities_and_tools_have_stable_errors(tool_adapter: SyncAdapter
         )
     with pytest.raises(ToolInputError):
         tool_adapter.execute("not_a_tool", {}, "unknown")
+
+
+def test_fundamentals_come_back_in_request_order_with_their_filings(
+    tool_adapter: SyncAdapter, data_plane
+) -> None:  # type: ignore[no-untyped-def]
+    result = tool_adapter.execute(
+        "quant_get_fundamentals", {"symbols": ["MSFT", "ZZZZ", "AAPL"], "metrics": ["revenue"]}, "f"
+    )
+
+    assert isinstance(result, FundamentalsEnvelope)
+    assert [company.symbol for company in result.data.companies] == ["MSFT", "ZZZZ", "AAPL"]
+    revenue = result.data.companies[0].metrics[0].ttm
+    assert revenue is not None and revenue.accessions == (
+        "0000000001-26-000001",
+        "0000000001-26-000020",
+    )
+    assert result.data.companies[1].unavailable == "not a tracked company with SEC filings"
+    assert len(data_plane.calls_to("/v1/fundamentals")) == 1
+
+
+def test_ratios_keep_their_exact_decimals_formulas_and_reasons(
+    tool_adapter: SyncAdapter, data_plane
+) -> None:  # type: ignore[no-untyped-def]
+    result = tool_adapter.execute("quant_get_fundamental_ratios", {"symbols": ["AAPL"]}, "r")
+
+    assert isinstance(result, FundamentalRatiosEnvelope)
+    ratios = {ratio.name: ratio for ratio in result.data.companies[0].ratios}
+    assert ratios["gross_margin"].value == EXACT_RATIO  # every digit, never a float
+    assert ratios["gross_margin"].formula == "gross_profit / revenue"
+    assert ratios["gross_margin"].inputs[0].caveat is not None
+    assert ratios["current_ratio"].value is None  # missing stays distinct from zero
+    assert ratios["current_ratio"].note == "missing: current_assets, current_liabilities"
+    assert len(data_plane.calls_to("/v1/fundamentals/ratios")) == 1
+
+
+def test_ratio_groups_narrow_the_request(tool_adapter: SyncAdapter) -> None:
+    result = tool_adapter.execute(
+        "quant_get_fundamental_ratios", {"symbols": ["AAPL"], "groups": ["liquidity"]}, "g"
+    )
+
+    assert isinstance(result, FundamentalRatiosEnvelope)
+    assert [ratio.group for ratio in result.data.companies[0].ratios] == ["liquidity"]
+
+
+@pytest.mark.parametrize(
+    ("tool", "arguments"),
+    [
+        ("quant_get_fundamentals", {"symbols": ["AAPL", "AAPL"]}),
+        ("quant_get_fundamentals", {"symbols": ["AAPL"], "metrics": ["revenue", "revenue"]}),
+        ("quant_get_fundamentals", {"symbols": ["AAPL"], "metrics": ["ebitda"]}),
+        ("quant_get_fundamentals", {"symbols": ["aapl"]}),
+        ("quant_get_fundamentals", {"symbols": [f"S{i}" for i in range(11)]}),
+        ("quant_get_fundamentals", {"symbols": ["AAPL"], "sql": "select 1"}),
+        ("quant_get_fundamental_ratios", {"symbols": ["AAPL"], "groups": ["vibes"]}),
+        ("quant_get_fundamental_ratios", {"symbols": []}),
+        ("quant_get_fundamental_ratios", {"symbols": ["AAPL"], "as_of": "not a date"}),
+    ],
+)
+def test_fundamentals_inputs_are_closed_and_bounded(
+    tool_adapter: SyncAdapter, tool: str, arguments: dict[str, object]
+) -> None:
+    with pytest.raises(ToolInputError):
+        tool_adapter.execute(tool, arguments, "bad")

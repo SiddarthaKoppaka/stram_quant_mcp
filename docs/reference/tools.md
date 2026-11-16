@@ -1,6 +1,6 @@
 # Tool reference
 
-This is the operator and consumer reference for the eleven tools implemented in
+This is the operator and consumer reference for the thirteen tools implemented in
 `src/stram_quant_mcp/tool_registry.py`. Machine-readable schemas and reviewed SHA-256 hashes are in
 `contracts/tool_schemas.json`; MCP `tools/list` returns the same input/output schemas and read-only
 annotations.
@@ -16,7 +16,7 @@ Successful calls return structured content with this envelope:
 ```json
 {
   "tool_version": "0.1.0",
-  "stram_data_version": "1.9.0",
+  "stram_data_version": "1.12.0",
   "interface_version": "1",
   "policy_version": "availability-policy-hash",
   "request_id": "server-generated-id",
@@ -130,6 +130,43 @@ words.
 
 ```json
 {"symbols":["SPY","AAPL"],"max_age_ms":15000}
+```
+
+### `quant_get_fundamentals`
+
+- Scope: `quant:read`
+- Data Interface: `get_fundamentals(FundamentalsQuery)` through `POST /v1/fundamentals`.
+- Input: `symbols`, 1 to 10 distinct uppercase symbols; optional `as_of` date (default today); optional
+  `metrics`, a distinct subset of `revenue`, `net_income`, `eps_diluted`, `operating_cash_flow`,
+  `total_assets`, `total_liabilities`, `shareholders_equity`, `cash`, `shares_outstanding` (empty:
+  all nine).
+- Data: one entry per requested symbol, in the requested order. Each metric names its taxonomy,
+  concept and unit, the fiscal year (`latest`) and trailing twelve months (`ttm`) for flows or the
+  latest balance, and for every value the period, the SEC accession numbers and the filed date. Only
+  filings made on or before `as_of` count, so an amendment filed later never changes an earlier
+  answer. A symbol that is not a tracked company says why in `unavailable`; it is not an error.
+
+```json
+{"symbols":["AAPL","NVDA"],"metrics":["revenue","net_income"]}
+```
+
+### `quant_get_fundamental_ratios`
+
+- Scope: `quant:read`
+- Data Interface: `get_fundamental_ratios(FundamentalRatiosQuery)` through
+  `POST /v1/fundamentals/ratios`. It needs Data Plane 1.11 or later.
+- Input: `symbols`, 1 to 10 distinct uppercase symbols; optional `as_of` date (default today);
+  optional `groups`, a distinct subset of `growth`, `profitability`, `cash_flow`, `liquidity`,
+  `leverage`, `valuation` (empty: all six).
+- Data: one entry per requested symbol, in the requested order. Each ratio has `value` (an exact
+  decimal string, or null), `group`, `basis`, `formula`, the `inputs` it used (each with its period,
+  source concept and any `caveat`) and a `note`. A ratio that cannot be worked out, or would mean
+  nothing, is null with the reason in `note`; it is never estimated, and null stays distinct from
+  zero. Financial companies get no margins or sales multiples, and valuation is only for US-GAAP
+  filers reporting in USD.
+
+```json
+{"symbols":["AAPL"],"groups":["profitability","valuation"]}
 ```
 
 ### `quant_get_series`

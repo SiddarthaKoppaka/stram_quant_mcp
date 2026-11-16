@@ -13,7 +13,7 @@ records evidence.
 
 ## Build and release gates
 
-Use the frozen lock and exact `stram-data` 1.9.0 pin (typed models only; no query runs in this process):
+Use the frozen lock and exact `stram-data` 1.12.0 pin (typed models only; no query runs in this process):
 
 ```bash
 uv sync --frozen --dev
@@ -81,7 +81,7 @@ The container `serve` command runs preflight before opening the listener. It fai
 - the configuration parses and the Data Plane client secret file exists.
 
 Preflight contacts no service. Application lifespan then verifies the audit chain, reads the Data
-Plane's OpenAPI document, requires service 1.9 or later and Data Interface v1, reads the availability
+Plane's OpenAPI document, requires service 1.11 or later and Data Interface v1, reads the availability
 policies with a real service token, and warms JWKS. Only then is readiness true.
 
 ```bash

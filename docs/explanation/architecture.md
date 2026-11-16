@@ -1,7 +1,7 @@
 # About the architecture
 
 This service is a thin, independently deployable MCP Tool Plane. It turns authenticated MCP requests
-into authenticated HTTP calls to the Stram Data Plane service (1.9 or later, Data Interface v1).
+into authenticated HTTP calls to the Stram Data Plane service (1.11 or later, Data Interface v1).
 Quantitative semantics stay in the Data Plane; this repository adds no SQL, joins, financial formulas,
 availability calculations or write paths, and it holds no lake mount, DuckDB or Parquet access.
 

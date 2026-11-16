@@ -7,7 +7,7 @@ approved yet.
 
 ## 1. What you are integrating
 
-The Quant MCP is a read-only [MCP](https://modelcontextprotocol.io) server with eleven typed tools over
+The Quant MCP is a read-only [MCP](https://modelcontextprotocol.io) server with thirteen typed tools over
 quantitative data (economic series, market bars, positioning, derived indicators, lineage, aligned
 panels and conditional-return studies). It does no calculation of its own: every number comes from the
 Data Plane service, which the MCP calls over HTTP with its own service identity.
@@ -69,7 +69,7 @@ test fixtures and must not be reused.
 | Scope | Tools it unlocks |
 |---|---|
 | `quant:discover` | `quant_list_series`, `quant_list_indicators`, `quant_list_indicator_subjects`, `quant_describe_availability`, `quant_get_freshness` |
-| `quant:read` | `quant_get_latest_quotes`, `quant_get_series`, `quant_get_derived` |
+| `quant:read` | `quant_get_latest_quotes`, `quant_get_series`, `quant_get_derived`, `quant_get_fundamentals`, `quant_get_fundamental_ratios` |
 | `quant:lineage` | `quant_get_lineage` |
 | `quant:analytics` | `quant_get_aligned_panel`, `quant_get_conditional_returns` |
 
@@ -107,6 +107,8 @@ in [`contracts/tool_schemas.json`](../../contracts/tool_schemas.json).
 | `quant_describe_availability` | discover | Learn what strict, estimated and ex_post mean per dataset | none | 10 s |
 | `quant_get_freshness` | discover | Check how current each dataset is | none | 10 s |
 | `quant_get_latest_quotes` | read | Read current IEX top-of-book quotes | 1-30 distinct `symbols`, optional `max_age_ms` 1-15000 | 10 s |
+| `quant_get_fundamentals` | read | Read reported company financials with their filings | 1-10 distinct `symbols`, optional `as_of`, optional `metrics` | 15 s |
+| `quant_get_fundamental_ratios` | read | Read margins, returns, leverage, growth and valuation with formulas | 1-10 distinct `symbols`, optional `as_of`, optional `groups` | 15 s |
 | `quant_get_series` | read | Read observations with revisions | `start_date`, `end_date`, one of `series_keys`/`indicator_ids`/`provider`, `availability`, `limit` | 10 s |
 | `quant_get_derived` | read | Read one derived indicator | `indicator_id`, dates, `subject`, `availability` | 10 s |
 | `quant_get_lineage` | lineage | Trace a derived value to its sources | `event_id` (UUID) | 10 s |
@@ -136,7 +138,7 @@ not the data):
 ```json
 {
   "tool_version": "0.1.0",
-  "stram_data_version": "1.9.0",
+  "stram_data_version": "1.12.0",
   "interface_version": "1",
   "policy_version": "availability-policy-hash",
   "request_id": "server-generated-id",
@@ -236,7 +238,7 @@ results inside `data`, not errors. A missing quote or value means no conclusion 
 | Item | State |
 |---|---|
 | Environment | Staging on SIDDU, tailnet only. The build that calls the Data Plane over HTTP is deployed by the operator; the repository's full acceptance check (`verify`) and rollback drill are not yet confirmed |
-| Versions | MCP 0.1.0, Data Plane 1.9.0, Data Interface v1; the MCP refuses to start against a Data Plane older than 1.9 |
+| Versions | MCP 0.1.0, Data Plane 1.12.0, Data Interface v1; the MCP refuses to start against a Data Plane older than 1.11 |
 | Production | Identity, hostname, TLS and approval are undecided |
 | End-user identity | Not configured (section 3); the Data Plane sees the MCP, not the user |
 | Market quotes and trades | Not exposed: real-time ingestion is not deployed |

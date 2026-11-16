@@ -13,11 +13,15 @@ from stram_data.data_interface import (
     ConditionalReturnsResult,
     DerivedResult,
     FreshnessReport,
+    FundamentalMetricName,
+    FundamentalRatiosResult,
+    FundamentalsResult,
     IndicatorInfo,
     LatestQuote,
     LineageResult,
     PanelResult,
     PolicyInfo,
+    RatioGroup,
     SeriesResult,
 )
 
@@ -206,6 +210,38 @@ class LatestQuotesInput(ContractModel):
     def validate_symbols(self) -> LatestQuotesInput:
         if len(set(self.symbols)) != len(self.symbols):
             raise ValueError("symbols must not contain duplicates")
+        return self
+
+
+class FundamentalsInput(ContractModel):
+    """Reported company financials for a bounded symbol set, as filed by an optional date."""
+
+    symbols: tuple[MarketSymbol, ...] = Field(min_length=1, max_length=10)
+    as_of: date | None = None
+    metrics: tuple[FundamentalMetricName, ...] = Field(default=(), max_length=9)
+
+    @model_validator(mode="after")
+    def validate_distinct(self) -> FundamentalsInput:
+        if len(set(self.symbols)) != len(self.symbols):
+            raise ValueError("symbols must not contain duplicates")
+        if len(set(self.metrics)) != len(self.metrics):
+            raise ValueError("metrics must not contain duplicates")
+        return self
+
+
+class FundamentalRatiosInput(ContractModel):
+    """Ratios worked out from reported financials, for a bounded symbol set."""
+
+    symbols: tuple[MarketSymbol, ...] = Field(min_length=1, max_length=10)
+    as_of: date | None = None
+    groups: tuple[RatioGroup, ...] = Field(default=(), max_length=6)
+
+    @model_validator(mode="after")
+    def validate_distinct(self) -> FundamentalRatiosInput:
+        if len(set(self.symbols)) != len(self.symbols):
+            raise ValueError("symbols must not contain duplicates")
+        if len(set(self.groups)) != len(self.groups):
+            raise ValueError("groups must not contain duplicates")
         return self
 
 
@@ -408,3 +444,5 @@ LineageEnvelope = ToolEnvelope[LineageResult]
 PanelEnvelope = ToolEnvelope[PanelResult | CleanPanelData]
 ConditionalReturnsEnvelope = ToolEnvelope[ConditionalReturnsResult | CleanConditionalReturnsData]
 LatestQuotesEnvelope = ToolEnvelope[LatestQuotesData]
+FundamentalsEnvelope = ToolEnvelope[FundamentalsResult]
+FundamentalRatiosEnvelope = ToolEnvelope[FundamentalRatiosResult]

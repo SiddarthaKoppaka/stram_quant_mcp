@@ -36,6 +36,8 @@ def test_every_real_result_round_trips_through_its_output_contract(
         "quant_describe_availability": {},
         "quant_get_freshness": {},
         "quant_get_latest_quotes": {"symbols": ["SPY"]},
+        "quant_get_fundamentals": {"symbols": ["AAPL", "ZZZZ"]},
+        "quant_get_fundamental_ratios": {"symbols": ["AAPL", "ZZZZ"]},
         "quant_get_series": {
             "series_keys": ["SPY"],
             "kinds": ["market_bar"],

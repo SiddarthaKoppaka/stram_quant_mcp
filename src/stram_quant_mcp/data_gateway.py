@@ -20,6 +20,10 @@ from stram_data.data_interface import (
     DerivedQuery,
     DerivedResult,
     FreshnessReport,
+    FundamentalRatiosQuery,
+    FundamentalRatiosResult,
+    FundamentalsQuery,
+    FundamentalsResult,
     IndicatorInfo,
     LatestQuote,
     LineageResult,
@@ -142,6 +146,20 @@ class DataGateway:
             "/v1/market/quotes", query, deadline_seconds, extra_scope=MARKET_IEX_SCOPE
         )
         return _parse(_LATEST_QUOTES, raw)
+
+    async def get_fundamentals(
+        self, query: FundamentalsQuery, *, deadline_seconds: float
+    ) -> FundamentalsResult:
+        """Read reported company financials (POST /v1/fundamentals)."""
+        raw = await self._post("/v1/fundamentals", query, deadline_seconds)
+        return _parse(FundamentalsResult, raw)
+
+    async def get_fundamental_ratios(
+        self, query: FundamentalRatiosQuery, *, deadline_seconds: float
+    ) -> FundamentalRatiosResult:
+        """Read ratios worked out from reported financials (POST /v1/fundamentals/ratios)."""
+        raw = await self._post("/v1/fundamentals/ratios", query, deadline_seconds)
+        return _parse(FundamentalRatiosResult, raw)
 
     async def _post(
         self,

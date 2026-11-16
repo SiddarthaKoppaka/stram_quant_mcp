@@ -5116,6 +5116,750 @@
       },
       "schemaHash": "1cbd4c85f4e5d9fd91064502f7cca8d03fbadc7e132f26de69851bee64d99ab0",
       "scope": "quant:read"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Read reported company financials from SEC XBRL filings: revenue, net income, diluted EPS and operating cash flow (latest fiscal year and trailing twelve months), and total assets, liabilities, equity, cash and shares outstanding (latest balance).\n\nUse when: a question needs a company's reported figures, with the filings they come from.\nDo not use for: ratios or margins (use quant_get_fundamental_ratios), prices, forecasts or estimates; values are as filed and only filings made by as_of count.\nInputs: symbols (1-10 distinct uppercase tickers); as_of optional date, default today; metrics optional subset of revenue, net_income, eps_diluted, operating_cash_flow, total_assets, total_liabilities, shareholders_equity, cash, shares_outstanding (empty: all).\nReturns: one entry per requested symbol in request order; each metric names its concept, unit, period, accession numbers and filed date. A symbol that is not a tracked company says so in `unavailable`.\nRead-only and idempotent; safe to call again.\n\nFailures return isError=true and _meta['io.stram/error'] with code, category, retryable, reason and next_action:\n- invalid_request: an argument is wrong; the reason names the field. Fix it. Not retryable.\n- access_denied: the token lacks this tool's scope. Not retryable; ask the administrator.\n- unavailable: the Data Plane is down or paused. Retryable with backoff; honour retry_after_seconds.\n- overloaded: capacity or rate limit reached. Retryable after retry_after_seconds.\n- deadline_exceeded: too slow. Retry once with a narrower range or fewer series.\n- data_plane_error, service_credentials_rejected, data_plane_forbidden: a server-side fault. Not retryable; report the request_id.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "Reported company financials for a bounded symbol set, as filed by an optional date.",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "As Of"
+          },
+          "metrics": {
+            "default": [],
+            "items": {
+              "enum": [
+                "revenue",
+                "net_income",
+                "eps_diluted",
+                "operating_cash_flow",
+                "total_assets",
+                "total_liabilities",
+                "shareholders_equity",
+                "cash",
+                "shares_outstanding"
+              ],
+              "type": "string"
+            },
+            "maxItems": 9,
+            "title": "Metrics",
+            "type": "array"
+          },
+          "symbols": {
+            "items": {
+              "maxLength": 20,
+              "minLength": 1,
+              "pattern": "^[A-Z0-9./-]+$",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "symbols"
+        ],
+        "title": "FundamentalsInput",
+        "type": "object"
+      },
+      "name": "quant_get_fundamentals",
+      "outputSchema": {
+        "$defs": {
+          "CompanyFundamentals": {
+            "additionalProperties": false,
+            "properties": {
+              "cik": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Cik"
+              },
+              "metrics": {
+                "items": {
+                  "$ref": "#/$defs/FundamentalMetric"
+                },
+                "title": "Metrics",
+                "type": "array"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "pe_ttm": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pe Ttm"
+              },
+              "price": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Price"
+              },
+              "price_date": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Price Date"
+              },
+              "symbol": {
+                "title": "Symbol",
+                "type": "string"
+              },
+              "unavailable": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Unavailable"
+              }
+            },
+            "required": [
+              "symbol",
+              "cik",
+              "name",
+              "metrics",
+              "price",
+              "price_date",
+              "pe_ttm",
+              "unavailable"
+            ],
+            "title": "CompanyFundamentals",
+            "type": "object"
+          },
+          "FundamentalMetric": {
+            "additionalProperties": false,
+            "properties": {
+              "concept": {
+                "title": "Concept",
+                "type": "string"
+              },
+              "latest": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/FundamentalValue"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "metric": {
+                "enum": [
+                  "revenue",
+                  "net_income",
+                  "eps_diluted",
+                  "operating_cash_flow",
+                  "total_assets",
+                  "total_liabilities",
+                  "shareholders_equity",
+                  "cash",
+                  "shares_outstanding"
+                ],
+                "title": "Metric",
+                "type": "string"
+              },
+              "taxonomy": {
+                "title": "Taxonomy",
+                "type": "string"
+              },
+              "ttm": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/FundamentalValue"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "unit": {
+                "title": "Unit",
+                "type": "string"
+              }
+            },
+            "required": [
+              "metric",
+              "taxonomy",
+              "concept",
+              "unit",
+              "latest",
+              "ttm"
+            ],
+            "title": "FundamentalMetric",
+            "type": "object"
+          },
+          "FundamentalValue": {
+            "additionalProperties": false,
+            "properties": {
+              "accessions": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Accessions",
+                "type": "array"
+              },
+              "filed": {
+                "format": "date",
+                "title": "Filed",
+                "type": "string"
+              },
+              "method": {
+                "enum": [
+                  "reported",
+                  "fiscal_year_plus_year_to_date"
+                ],
+                "title": "Method",
+                "type": "string"
+              },
+              "period_end": {
+                "format": "date",
+                "title": "Period End",
+                "type": "string"
+              },
+              "period_start": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Period Start"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "title": "Value"
+              }
+            },
+            "required": [
+              "value",
+              "period_start",
+              "period_end",
+              "accessions",
+              "filed",
+              "method"
+            ],
+            "title": "FundamentalValue",
+            "type": "object"
+          },
+          "FundamentalsResult": {
+            "additionalProperties": false,
+            "properties": {
+              "as_of": {
+                "format": "date",
+                "title": "As Of",
+                "type": "string"
+              },
+              "availability_note": {
+                "title": "Availability Note",
+                "type": "string"
+              },
+              "companies": {
+                "items": {
+                  "$ref": "#/$defs/CompanyFundamentals"
+                },
+                "title": "Companies",
+                "type": "array"
+              }
+            },
+            "required": [
+              "as_of",
+              "companies",
+              "availability_note"
+            ],
+            "title": "FundamentalsResult",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/FundamentalsResult"
+          },
+          "interface_version": {
+            "title": "Interface Version",
+            "type": "string"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "stram_data_version": {
+            "title": "Stram Data Version",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tool_version",
+          "stram_data_version",
+          "interface_version",
+          "policy_version",
+          "request_id",
+          "data"
+        ],
+        "title": "ToolEnvelope[FundamentalsResult]",
+        "type": "object"
+      },
+      "schemaHash": "f10052361341ae327aaf5afba44cb3ec14c3644e1368fc7441a200dcb05b33f8",
+      "scope": "quant:read"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Read ratios worked out from reported company financials: growth, profitability, cash flow, liquidity, leverage and valuation.\n\nUse when: a question needs margins, returns, free cash flow, leverage, growth or valuation multiples, with the formula and inputs behind each.\nDo not use for: raw reported figures (use quant_get_fundamentals), forecasts or advice; a ratio that cannot be worked out is null with a reason in `note` and is never estimated. Financial companies get no margins or sales multiples, and valuation is for US-GAAP filers in USD.\nInputs: symbols (1-10 distinct uppercase tickers); as_of optional date, default today; groups optional subset of growth, profitability, cash_flow, liquidity, leverage, valuation (empty: all).\nReturns: one entry per requested symbol in request order; each ratio has its value (or null), formula, basis, the inputs used with their periods and source concepts, and a note.\nRead-only and idempotent; safe to call again.\n\nFailures return isError=true and _meta['io.stram/error'] with code, category, retryable, reason and next_action:\n- invalid_request: an argument is wrong; the reason names the field. Fix it. Not retryable.\n- access_denied: the token lacks this tool's scope. Not retryable; ask the administrator.\n- unavailable: the Data Plane is down or paused. Retryable with backoff; honour retry_after_seconds.\n- overloaded: capacity or rate limit reached. Retryable after retry_after_seconds.\n- deadline_exceeded: too slow. Retry once with a narrower range or fewer series.\n- data_plane_error, service_credentials_rejected, data_plane_forbidden: a server-side fault. Not retryable; report the request_id.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "description": "Ratios worked out from reported financials, for a bounded symbol set.",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "As Of"
+          },
+          "groups": {
+            "default": [],
+            "items": {
+              "enum": [
+                "growth",
+                "profitability",
+                "cash_flow",
+                "liquidity",
+                "leverage",
+                "valuation"
+              ],
+              "type": "string"
+            },
+            "maxItems": 6,
+            "title": "Groups",
+            "type": "array"
+          },
+          "symbols": {
+            "items": {
+              "maxLength": 20,
+              "minLength": 1,
+              "pattern": "^[A-Z0-9./-]+$",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "symbols"
+        ],
+        "title": "FundamentalRatiosInput",
+        "type": "object"
+      },
+      "name": "quant_get_fundamental_ratios",
+      "outputSchema": {
+        "$defs": {
+          "CompanyRatios": {
+            "additionalProperties": false,
+            "properties": {
+              "cik": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Cik"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "price": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Price"
+              },
+              "price_date": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Price Date"
+              },
+              "ratios": {
+                "items": {
+                  "$ref": "#/$defs/FundamentalRatio"
+                },
+                "title": "Ratios",
+                "type": "array"
+              },
+              "symbol": {
+                "title": "Symbol",
+                "type": "string"
+              },
+              "unavailable": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Unavailable"
+              }
+            },
+            "required": [
+              "symbol",
+              "cik",
+              "name",
+              "price",
+              "price_date",
+              "ratios",
+              "unavailable"
+            ],
+            "title": "CompanyRatios",
+            "type": "object"
+          },
+          "FundamentalRatio": {
+            "additionalProperties": false,
+            "properties": {
+              "basis": {
+                "enum": [
+                  "ttm",
+                  "annual",
+                  "latest_balance",
+                  "mixed"
+                ],
+                "title": "Basis",
+                "type": "string"
+              },
+              "formula": {
+                "title": "Formula",
+                "type": "string"
+              },
+              "group": {
+                "enum": [
+                  "growth",
+                  "profitability",
+                  "cash_flow",
+                  "liquidity",
+                  "leverage",
+                  "valuation"
+                ],
+                "title": "Group",
+                "type": "string"
+              },
+              "inputs": {
+                "items": {
+                  "$ref": "#/$defs/RatioInput"
+                },
+                "title": "Inputs",
+                "type": "array"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Note"
+              },
+              "period_end": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Period End"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Value"
+              }
+            },
+            "required": [
+              "name",
+              "group",
+              "value",
+              "basis",
+              "formula",
+              "inputs",
+              "period_end",
+              "note"
+            ],
+            "title": "FundamentalRatio",
+            "type": "object"
+          },
+          "FundamentalRatiosResult": {
+            "additionalProperties": false,
+            "properties": {
+              "as_of": {
+                "format": "date",
+                "title": "As Of",
+                "type": "string"
+              },
+              "availability_note": {
+                "title": "Availability Note",
+                "type": "string"
+              },
+              "companies": {
+                "items": {
+                  "$ref": "#/$defs/CompanyRatios"
+                },
+                "title": "Companies",
+                "type": "array"
+              }
+            },
+            "required": [
+              "as_of",
+              "companies",
+              "availability_note"
+            ],
+            "title": "FundamentalRatiosResult",
+            "type": "object"
+          },
+          "RatioInput": {
+            "additionalProperties": false,
+            "properties": {
+              "caveat": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Caveat"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "period_end": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Period End"
+              },
+              "source": {
+                "title": "Source",
+                "type": "string"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "title": "Value"
+              }
+            },
+            "required": [
+              "name",
+              "value",
+              "period_end",
+              "source",
+              "caveat"
+            ],
+            "title": "RatioInput",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/FundamentalRatiosResult"
+          },
+          "interface_version": {
+            "title": "Interface Version",
+            "type": "string"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "stram_data_version": {
+            "title": "Stram Data Version",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tool_version",
+          "stram_data_version",
+          "interface_version",
+          "policy_version",
+          "request_id",
+          "data"
+        ],
+        "title": "ToolEnvelope[FundamentalRatiosResult]",
+        "type": "object"
+      },
+      "schemaHash": "7eaad5719399db685c9e598bafd117a07ff85ec8ed908c358b4167b0ed00ad07",
+      "scope": "quant:read"
     }
   ]
 }

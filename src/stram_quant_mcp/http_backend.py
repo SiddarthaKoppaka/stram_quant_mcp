@@ -31,7 +31,7 @@ from stram_quant_mcp.errors import (
 )
 from stram_quant_mcp.tool_adapter import QuantToolAdapter
 
-MINIMUM_SERVICE_VERSION: Final = (1, 9)
+MINIMUM_SERVICE_VERSION: Final = (1, 11)
 EXPECTED_INTERFACE_VERSION: Final = INTERFACE_VERSION
 STARTUP_TIMEOUT_SECONDS: Final = 15.0
 MAX_REQUEST_ID_CHARS: Final = 128

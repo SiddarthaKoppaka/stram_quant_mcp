@@ -47,5 +47,5 @@ async def backend(client: DataPlaneClient) -> AsyncIterator[HttpDataBackend]:
 @pytest.fixture
 def tool_adapter(client: DataPlaneClient) -> SyncAdapter:
     gateway = DataGateway(client)
-    adapter = QuantToolAdapter(gateway, policy_version="test-policy", service_version="1.9.0")
+    adapter = QuantToolAdapter(gateway, policy_version="test-policy", service_version="1.12.0")
     return SyncAdapter(adapter)

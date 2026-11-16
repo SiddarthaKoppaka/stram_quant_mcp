@@ -13,6 +13,8 @@ from stram_data.data_interface import (
     ConditionalReturnsResult,
     DerivedQuery,
     DerivedResult,
+    FundamentalRatiosQuery,
+    FundamentalsQuery,
     MarketDataBatchQuery,
     PanelColumn,
     PanelQuery,
@@ -37,6 +39,8 @@ from stram_quant_mcp.tool_models import (
     CatalogInput,
     ConditionalReturnsInput,
     DerivedInput,
+    FundamentalRatiosInput,
+    FundamentalsInput,
     IndicatorsData,
     IndicatorSubjectsData,
     IndicatorSubjectsInput,
@@ -129,6 +133,8 @@ class QuantToolAdapter:
             "quant_get_aligned_panel": self._panel,
             "quant_get_conditional_returns": self._conditional_returns,
             "quant_get_latest_quotes": self._latest_quotes,
+            "quant_get_fundamentals": self._fundamentals,
+            "quant_get_fundamental_ratios": self._fundamental_ratios,
         }
 
     async def _catalog(self, request: BaseModel, deadline: float) -> BaseModel:
@@ -188,6 +194,31 @@ class QuantToolAdapter:
                 "The Data Plane returned quote symbols that do not match the requested order."
             )
         return LatestQuotesData(quotes=quotes)
+
+    async def _fundamentals(self, request: BaseModel, deadline: float) -> BaseModel:
+        asked = cast(FundamentalsInput, request)
+        result = await self._gateway.get_fundamentals(
+            FundamentalsQuery(symbols=asked.symbols, as_of=asked.as_of, metrics=asked.metrics),
+            deadline_seconds=deadline,
+        )
+        _same_symbols(asked.symbols, tuple(company.symbol for company in result.companies))
+        return result
+
+    async def _fundamental_ratios(self, request: BaseModel, deadline: float) -> BaseModel:
+        asked = cast(FundamentalRatiosInput, request)
+        result = await self._gateway.get_fundamental_ratios(
+            FundamentalRatiosQuery(symbols=asked.symbols, as_of=asked.as_of, groups=asked.groups),
+            deadline_seconds=deadline,
+        )
+        _same_symbols(asked.symbols, tuple(company.symbol for company in result.companies))
+        return result
+
+
+def _same_symbols(asked: tuple[str, ...], returned: tuple[str, ...]) -> None:
+    if returned != asked:
+        raise ToolUpstreamError(
+            "The Data Plane returned companies that do not match the requested order."
+        )
 
 
 def _panel_query(request: PanelInput) -> PanelQuery:

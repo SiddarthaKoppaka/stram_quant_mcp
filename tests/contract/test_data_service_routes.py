@@ -11,7 +11,7 @@ from stram_data.service.app import create_app
 from tests.support.fake_data_plane import LAKE
 
 ROOT = Path(__file__).parents[2]
-SNAPSHOT = json.loads((ROOT / "contracts/data_service.v1.9.0.json").read_text())
+SNAPSHOT = json.loads((ROOT / "contracts/data_service.v1.12.0.json").read_text())
 
 
 class _Verifier:

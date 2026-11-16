@@ -161,4 +161,32 @@ TOOL_DOCS: dict[str, ToolDocs] = {
         "one result per requested symbol in request order. Each result has status, reason, "
         "provenance and, only when fresh, bid and ask values.",
     ),
+    "quant_get_fundamentals": ToolDocs(
+        "Read reported company financials from SEC XBRL filings: revenue, net income, diluted EPS "
+        "and operating cash flow (latest fiscal year and trailing twelve months), and total "
+        "assets, liabilities, equity, cash and shares outstanding (latest balance).",
+        "a question needs a company's reported figures, with the filings they come from.",
+        "ratios or margins (use quant_get_fundamental_ratios), prices, forecasts or estimates; "
+        "values are as filed and only filings made by as_of count.",
+        "symbols (1-10 distinct uppercase tickers); as_of optional date, default today; metrics "
+        "optional subset of revenue, net_income, eps_diluted, operating_cash_flow, total_assets, "
+        "total_liabilities, shareholders_equity, cash, shares_outstanding (empty: all).",
+        "one entry per requested symbol in request order; each metric names its concept, unit, "
+        "period, accession numbers and filed date. A symbol that is not a tracked company says so "
+        "in `unavailable`.",
+    ),
+    "quant_get_fundamental_ratios": ToolDocs(
+        "Read ratios worked out from reported company financials: growth, profitability, cash "
+        "flow, liquidity, leverage and valuation.",
+        "a question needs margins, returns, free cash flow, leverage, growth or valuation "
+        "multiples, with the formula and inputs behind each.",
+        "raw reported figures (use quant_get_fundamentals), forecasts or advice; a ratio that "
+        "cannot be worked out is null with a reason in `note` and is never estimated. Financial "
+        "companies get no margins or sales multiples, and valuation is for US-GAAP filers in USD.",
+        "symbols (1-10 distinct uppercase tickers); as_of optional date, default today; groups "
+        "optional subset of growth, profitability, cash_flow, liquidity, leverage, valuation "
+        "(empty: all).",
+        "one entry per requested symbol in request order; each ratio has its value (or null), "
+        "formula, basis, the inputs used with their periods and source concepts, and a note.",
+    ),
 }

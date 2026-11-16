@@ -14,7 +14,7 @@ SNAPSHOT = json.loads((ROOT / "contracts/data_interface.realtime-batch.json").re
 
 
 def test_exact_data_interface_release_is_installed() -> None:
-    assert stram_data.__version__ == SNAPSHOT["package_version"] == "1.9.0"
+    assert stram_data.__version__ == SNAPSHOT["package_version"] == "1.12.0"
     assert public.INTERFACE_VERSION == SNAPSHOT["interface_version"] == "1"
 
 

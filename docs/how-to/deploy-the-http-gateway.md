@@ -113,7 +113,7 @@ Read the `category` in the tool error and the audit outcome.
 |---|---|---|
 | `service_credentials` | Wrong secret, audience or scopes on the Keycloak client | Check the client in Keycloak and the mounted secret file; do not restart in a loop |
 | `data_plane_unavailable` | Data Plane down, or the egress rule is missing | Check the service on port 8444 and `nft list chain inet stram_quant output` |
-| `data_plane_error` | Data Plane fault or an incompatible version | Capture the MCP and Data Plane request ids; check the Data Plane is 1.9 or later |
+| `data_plane_error` | Data Plane fault or an incompatible version | Capture the MCP and Data Plane request ids; check the Data Plane is 1.11 or later |
 | `deadline` | A slow Data Plane query | Narrow the query before raising any deadline |
 
 See [Tool reference](../reference/tools.md#error-replies) for the full error table and

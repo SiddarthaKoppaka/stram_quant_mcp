@@ -8,17 +8,27 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 
 import httpx
 from stram_data.data_interface import (
+    CompanyFundamentals,
+    CompanyRatios,
     DataInterface,
+    FundamentalMetric,
+    FundamentalRatio,
+    FundamentalRatiosQuery,
+    FundamentalRatiosResult,
+    FundamentalsQuery,
+    FundamentalsResult,
+    FundamentalValue,
     LatestQuote,
     MarketDataBatchQuery,
     MarketDataProvenance,
     QuoteValues,
+    RatioInput,
 )
 from stram_data.service.app import create_app
 from stram_data.service.auth import AuthenticationError, Caller
@@ -54,10 +64,16 @@ class _StubVerifier:
 
 
 class _SyntheticQuoteDataInterface(DataInterface):
-    """Use fixture-only stored quotes while exercising the real HTTP route and authorization."""
+    """Use fixture-only data where the real read needs a database, keeping the real HTTP route."""
 
     def get_latest_quotes(self, query: MarketDataBatchQuery) -> tuple[LatestQuote, ...]:
         return _latest_quotes(query.symbols, query.max_age_ms)
+
+    def get_fundamentals(self, query: FundamentalsQuery) -> FundamentalsResult:
+        return fundamentals_result(query.symbols, query.as_of)
+
+    def get_fundamental_ratios(self, query: FundamentalRatiosQuery) -> FundamentalRatiosResult:
+        return ratios_result(query.symbols, query.as_of, query.groups)
 
 
 class FakeDataPlane(httpx.AsyncBaseTransport):
@@ -96,6 +112,16 @@ class FakeDataPlane(httpx.AsyncBaseTransport):
         quotes = _latest_quotes(symbols, max_age_ms)
         content = json.dumps([quote.model_dump(mode="json") for quote in quotes])
         return httpx.Response(200, content=content)
+
+    def fundamentals_response(self, symbols: tuple[str, ...]) -> httpx.Response:
+        """A structurally valid /v1/fundamentals reply, for a deliberate transport override."""
+
+        return httpx.Response(200, content=fundamentals_result(symbols).model_dump_json())
+
+    def ratios_response(self, symbols: tuple[str, ...]) -> httpx.Response:
+        """A structurally valid /v1/fundamentals/ratios reply, for a deliberate override."""
+
+        return httpx.Response(200, content=ratios_result(symbols).model_dump_json())
 
     def _token(self, request: httpx.Request) -> httpx.Response:
         form = dict(item.split("=", 1) for item in request.content.decode().split("&") if item)
@@ -149,6 +175,108 @@ def _latest_quotes(symbols: tuple[str, ...], max_age_ms: int) -> tuple[LatestQuo
             last_quote=None,
         )
         for symbol in symbols
+    )
+
+
+UNTRACKED = "ZZZZ"
+AS_OF = date(2026, 11, 11)
+# A value with many digits: it must reach the caller exactly, not through a float.
+EXACT_RATIO = Decimal("0.6086956521739130434782608696")
+
+
+def fundamentals_result(symbols: tuple[str, ...], as_of: date | None = None) -> FundamentalsResult:
+    """Fixture financials in request order; ZZZZ stands for a company that is not tracked."""
+
+    value = FundamentalValue(
+        value=Decimal("1150"),
+        period_start=date(2025, 7, 1),
+        period_end=date(2026, 6, 30),
+        accessions=("0000000001-26-000001", "0000000001-26-000020"),
+        filed=date(2026, 8, 1),
+        method="fiscal_year_plus_year_to_date",
+    )
+    tracked = FundamentalMetric(
+        metric="revenue",
+        taxonomy="us-gaap",
+        concept="Revenues",
+        unit="USD",
+        latest=value.model_copy(update={"value": Decimal("1000"), "method": "reported"}),
+        ttm=value,
+    )
+    companies = tuple(
+        CompanyFundamentals(
+            symbol=symbol,
+            cik=None if symbol == UNTRACKED else "0000000001",
+            name=None if symbol == UNTRACKED else "Acme Corp",
+            metrics=() if symbol == UNTRACKED else (tracked,),
+            price=None,
+            price_date=None,
+            pe_ttm=None,
+            unavailable="not a tracked company with SEC filings" if symbol == UNTRACKED else None,
+        )
+        for symbol in symbols
+    )
+    return FundamentalsResult(
+        as_of=as_of or AS_OF, companies=companies, availability_note="Fixture financials."
+    )
+
+
+def ratios_result(
+    symbols: tuple[str, ...], as_of: date | None = None, groups: tuple[str, ...] = ()
+) -> FundamentalRatiosResult:
+    """Fixture ratios in request order: one worked out and one null with its reason."""
+
+    inputs = (
+        RatioInput(
+            name="gross_profit",
+            value=Decimal("700"),
+            period_end=date(2026, 6, 30),
+            source="derived",
+            caveat="gross profit is derived as revenue - cost_of_revenue (not reported)",
+        ),
+        RatioInput(
+            name="revenue",
+            value=Decimal("1150"),
+            period_end=date(2026, 6, 30),
+            source="us-gaap:Revenues",
+            caveat=None,
+        ),
+    )
+    worked = FundamentalRatio(
+        name="gross_margin",
+        group="profitability",
+        value=EXACT_RATIO,
+        basis="ttm",
+        formula="gross_profit / revenue",
+        inputs=inputs,
+        period_end=date(2026, 6, 30),
+        note=inputs[0].caveat,
+    )
+    missing = FundamentalRatio(
+        name="current_ratio",
+        group="liquidity",
+        value=None,
+        basis="latest_balance",
+        formula="current_assets / current_liabilities",
+        inputs=(),
+        period_end=None,
+        note="missing: current_assets, current_liabilities",
+    )
+    kept = tuple(r for r in (worked, missing) if not groups or r.group in groups)
+    companies = tuple(
+        CompanyRatios(
+            symbol=symbol,
+            cik=None if symbol == UNTRACKED else "0000000001",
+            name=None if symbol == UNTRACKED else "Acme Corp",
+            price=None,
+            price_date=None,
+            ratios=() if symbol == UNTRACKED else kept,
+            unavailable="not a tracked company with SEC filings" if symbol == UNTRACKED else None,
+        )
+        for symbol in symbols
+    )
+    return FundamentalRatiosResult(
+        as_of=as_of or AS_OF, companies=companies, availability_note="Fixture ratios."
     )
 
 
