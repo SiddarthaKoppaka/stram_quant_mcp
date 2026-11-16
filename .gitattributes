@@ -1,0 +1,4 @@
+# Keep LF line endings in the repository whatever editor or OS writes the file.
+* text=auto eol=lf
+*.parquet binary
+*.png binary
