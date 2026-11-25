@@ -17,10 +17,10 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: SiddarthaKoppaka/stram_data
-          ref: 2eaf9aef309e3be3ed6d575cbc84d7813b1ea6be # pragma: allowlist secret; public commit
+          ref: f4396f5d8e4c65016a71c6db8c39bb8e72acb80a # pragma: allowlist secret; public commit
           token: ${{ secrets.STRAM_DATA_READ_TOKEN }}
           path: stram_data
-          # prepare_container_dependency.sh verifies the pinned commit declares version 1.12.0.
+          # prepare_container_dependency.sh verifies the pinned commit declares version 1.16.0.
           fetch-depth: 0
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:

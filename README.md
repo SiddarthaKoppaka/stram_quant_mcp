@@ -34,12 +34,12 @@ the call closed. See [Architecture](docs/explanation/architecture.md) for the co
 ## Quick start
 
 Supported toolchain: CPython 3.12 through 3.14 and `uv`. The lock pins the exact `stram-data` source
-commit for release 1.12.0, used for its typed models only. Private repository access is needed only when the dependency is not already
+commit for release 1.16.0, used for its typed models only. Private repository access is needed only when the dependency is not already
 available in the local cache.
 
 ```bash
 uv sync --frozen --dev
-uv run python -c 'import stram_data; assert stram_data.__version__ == "1.12.0"'
+uv run python -c 'import stram_data; assert stram_data.__version__ == "1.16.0"'
 uv run pytest tests/integration/test_mcp_client.py -q
 ```
 

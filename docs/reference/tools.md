@@ -16,7 +16,7 @@ Successful calls return structured content with this envelope:
 ```json
 {
   "tool_version": "0.1.0",
-  "stram_data_version": "1.12.0",
+  "stram_data_version": "1.16.0",
   "interface_version": "1",
   "policy_version": "availability-policy-hash",
   "request_id": "server-generated-id",
@@ -173,9 +173,16 @@ words.
 - Required: `start_date`, `end_date`, and at least one of `series_keys`, `indicator_ids` or `provider`.
 - Filters: up to 10 `series_keys`; up to 10 `indicator_ids`; optional `provider`; non-empty `kinds`
   drawn from `economic`, `rates`, `market_bar`, `positioning`, `derived` (default all).
-- Controls: optional `as_of`; `all_versions` default false; `limit` 1 to 500, default 100;
+- Controls: optional `as_of`; `all_versions` default false; `limit` 1 to 5000, default 100;
+  `order` `asc` (default, oldest first) or `desc` (newest first; needs Data Plane 1.15 or later);
   `availability` default `strict`.
 - Data: rows plus count, limit, `truncated`, `as_of`, availability note and availability summary.
+- Newest first: with `order=desc` a `limit` that cuts the result keeps the newest rows, so a year or
+  five years of daily closes (about 252 or 1,260 rows) is one call. With the default `asc` a cut
+  keeps the oldest rows and drops the newest.
+- Longer history: a range is at most 1,830 days. While `truncated` is true, call again with
+  `order=desc` and `end_date` moved to the day before the oldest returned `observed_on`. There is no
+  cursor.
 
 ```json
 {

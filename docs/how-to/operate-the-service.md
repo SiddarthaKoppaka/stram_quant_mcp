@@ -13,7 +13,7 @@ records evidence.
 
 ## Build and release gates
 
-Use the frozen lock and exact `stram-data` 1.12.0 pin (typed models only; no query runs in this process):
+Use the frozen lock and exact `stram-data` 1.16.0 pin (typed models only; no query runs in this process):
 
 ```bash
 uv sync --frozen --dev

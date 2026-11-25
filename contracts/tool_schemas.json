@@ -871,7 +871,7 @@
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "Read bounded quantitative series with revisions and availability semantics preserved.\n\nUse when: you need observations for known series_keys, indicator_ids or a provider over a date range.\nDo not use for: listing what exists (use quant_list_series) or computed indicators (use quant_get_derived).\nInputs: start_date and end_date (inclusive, at most 1830 days apart); at least one of series_keys, indicator_ids, provider; kinds; as_of; all_versions; limit 1-500 (default 100); availability strict (default) | estimated | ex_post (hindsight-only, cannot be combined with as_of); view raw|clean.\nReturns: rows with value, unit, quality flags, known_since, revision and lineage ids; truncated=true means narrow the range or filters.\nRead-only and idempotent; safe to call again.\n\nFailures return isError=true and _meta['io.stram/error'] with code, category, retryable, reason and next_action:\n- invalid_request: an argument is wrong; the reason names the field. Fix it. Not retryable.\n- access_denied: the token lacks this tool's scope. Not retryable; ask the administrator.\n- unavailable: the Data Plane is down or paused. Retryable with backoff; honour retry_after_seconds.\n- overloaded: capacity or rate limit reached. Retryable after retry_after_seconds.\n- deadline_exceeded: too slow. Retry once with a narrower range or fewer series.\n- data_plane_error, service_credentials_rejected, data_plane_forbidden: a server-side fault. Not retryable; report the request_id.\n- resource_limit: the result is too large. Reduce limit, window or series. Not retryable unchanged.",
+      "description": "Read bounded quantitative series with revisions and availability semantics preserved.\n\nUse when: you need observations for known series_keys, indicator_ids or a provider over a date range.\nDo not use for: listing what exists (use quant_list_series) or computed indicators (use quant_get_derived).\nInputs: start_date and end_date (inclusive, at most 1830 days apart); at least one of series_keys, indicator_ids, provider; kinds; as_of; all_versions; limit 1-5000 (default 100); order asc (default, oldest first) | desc (newest first); availability strict (default) | estimated | ex_post (hindsight-only, cannot be combined with as_of); view raw|clean. order=desc needs a Data Plane of version 1.15 or later.\nReturns: rows with value, unit, quality flags, known_since, revision and lineage ids, oldest first or, with order=desc, newest first; truncated=true means the limit cut the result (with order=asc it dropped the newest rows, with order=desc the oldest), so narrow the range or filters. To read history beyond 1830 days, call again with order=desc and end_date moved to the day before the oldest observed_on returned, and repeat while truncated is true (there is no cursor).\nRead-only and idempotent; safe to call again.\n\nFailures return isError=true and _meta['io.stram/error'] with code, category, retryable, reason and next_action:\n- invalid_request: an argument is wrong; the reason names the field. Fix it. Not retryable.\n- access_denied: the token lacks this tool's scope. Not retryable; ask the administrator.\n- unavailable: the Data Plane is down or paused. Retryable with backoff; honour retry_after_seconds.\n- overloaded: capacity or rate limit reached. Retryable after retry_after_seconds.\n- deadline_exceeded: too slow. Retry once with a narrower range or fewer series.\n- data_plane_error, service_credentials_rejected, data_plane_forbidden: a server-side fault. Not retryable; report the request_id.\n- resource_limit: the result is too large. Reduce limit, window or series. Not retryable unchanged.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -943,10 +943,19 @@
           },
           "limit": {
             "default": 100,
-            "maximum": 500,
+            "maximum": 5000,
             "minimum": 1,
             "title": "Limit",
             "type": "integer"
+          },
+          "order": {
+            "default": "asc",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "title": "Order",
+            "type": "string"
           },
           "provider": {
             "anyOf": [
@@ -1635,7 +1644,7 @@
         "title": "ToolEnvelope[Union[SeriesResult, CleanSeriesData]]",
         "type": "object"
       },
-      "schemaHash": "7a3ab74e1119462a10f436ec0ee2bf99377ba32f53c69e30f7884efcb155da68",
+      "schemaHash": "03e3a2f76c513631c368cd22bd4d565b5a714401dde226c59c7a2fa5d72dbb2b",
       "scope": "quant:read"
     },
     {
