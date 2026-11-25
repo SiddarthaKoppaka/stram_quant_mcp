@@ -1,13 +1,14 @@
 {
   "interface_version": "1",
-  "package_commit": "2eaf9aef309e3be3ed6d575cbc84d7813b1ea6be",
-  "package_version": "1.12.0",
+  "package_commit": "f4396f5d8e4c65016a71c6db8c39bb8e72acb80a",
+  "package_version": "1.16.0",
   "public_methods": [
     "describe_availability_policies",
     "get_aligned_panel",
     "get_catalog",
     "get_conditional_returns",
     "get_derived",
+    "get_filing_sections",
     "get_freshness",
     "get_fundamental_ratios",
     "get_fundamentals",
@@ -23,6 +24,7 @@
     "get_news_timeline",
     "get_quote_status",
     "get_series",
+    "get_short_interest",
     "list_indicator_subjects",
     "list_indicators"
   ],

@@ -202,7 +202,7 @@ def test_strict_prevents_lookahead_and_estimated_preserves_evidence(
             "series_keys": ["SPY"],
             "start_date": "2026-10-01",
             "end_date": "2026-10-02",
-            "limit": 501,
+            "limit": 5001,
         },
         {
             "series_keys": ["SPY; SELECT 1"],

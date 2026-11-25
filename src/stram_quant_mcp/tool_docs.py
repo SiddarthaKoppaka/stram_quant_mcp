@@ -102,11 +102,16 @@ TOOL_DOCS: dict[str, ToolDocs] = {
         "listing what exists (use quant_list_series) or computed indicators (use "
         "quant_get_derived).",
         "start_date and end_date (inclusive, at most 1830 days apart); at least one of "
-        "series_keys, indicator_ids, provider; kinds; as_of; all_versions; limit 1-500 (default "
-        "100); availability strict (default) | estimated | ex_post (hindsight-only, cannot be "
-        "combined with as_of); view raw|clean.",
-        "rows with value, unit, quality flags, known_since, revision and lineage ids; "
-        "truncated=true means narrow the range or filters.",
+        "series_keys, indicator_ids, provider; kinds; as_of; all_versions; limit 1-5000 (default "
+        "100); order asc (default, oldest first) | desc (newest first); availability strict "
+        "(default) | estimated | ex_post (hindsight-only, cannot be combined with as_of); view "
+        "raw|clean. order=desc needs a Data Plane of version 1.15 or later.",
+        "rows with value, unit, quality flags, known_since, revision and lineage ids, oldest first "
+        "or, with order=desc, newest first; truncated=true means the limit cut the result (with "
+        "order=asc it dropped the newest rows, with order=desc the oldest), so narrow the range "
+        "or filters. To read history beyond 1830 days, call again with order=desc and end_date "
+        "moved to the day before the oldest observed_on returned, and repeat while truncated is "
+        "true (there is no cursor).",
         ("resource_limit",),
     ),
     "quant_get_derived": ToolDocs(

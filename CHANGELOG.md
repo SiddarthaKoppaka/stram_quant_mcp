@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — quant_get_series: newest first, and up to 5,000 rows
+
+- `quant_get_series` gains an optional `order`, `asc` (the default, oldest first) or `desc` (newest
+  first), passed to the Data Interface `SeriesQuery.order`, and its `limit` maximum rises from 500 to
+  5,000 (the Data Interface `MAX_LIMIT`); the default limit (100) and the default order are unchanged.
+  With `desc` a cut keeps the newest rows, so a year or five years of daily closes is one call. History
+  beyond the 1,830-day range is read by moving `end_date` to the day before the oldest returned
+  `observed_on` while `truncated` is true; there is no cursor. The tool text says so. Only the schema
+  hash of `quant_get_series` changes (the other twelve tools are byte-identical); the schema artifact is
+  regenerated, and STRAM's pinned copy must be updated with this release.
+- A default call sends the Data Plane the request it sent before: `order` is left out of the body when it
+  is `asc`, so it still works against a Data Plane older than 1.15. `order=desc` needs Data Plane 1.15 or
+  later; the minimum service version for startup is unchanged (1.11).
+- Moves the `stram-data` pin to 1.16.0 at the merged commit `f4396f5d8e4c65016a71c6db8c39bb8e72acb80a`
+  (CI ref, dependency script, lock, image wheel, release snapshot) and the image's Debian snapshot to
+  2026-11-24, as the Qual MCP did.
+
 ## Unreleased — identity providers that need the audience named
 
 - The Data Plane client can name the audience and scopes on every token request: the optional

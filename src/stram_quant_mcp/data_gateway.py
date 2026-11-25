@@ -120,7 +120,14 @@ class DataGateway:
 
     async def get_series(self, query: SeriesQuery, *, deadline_seconds: float) -> SeriesResult:
         """Query series (POST /v1/series/query)."""
-        raw = await self._post("/v1/series/query", query, deadline_seconds)
+        raw = await self._post(
+            "/v1/series/query",
+            query,
+            deadline_seconds,
+            # The default order is not sent, so a default call is the request it was before
+            # Data Interface 1.15 and still works against an older Data Plane.
+            exclude=frozenset({"order"}) if query.order == "asc" else frozenset(),
+        )
         return _parse(SeriesResult, raw)
 
     async def get_derived(self, query: DerivedQuery, *, deadline_seconds: float) -> DerivedResult:
@@ -170,6 +177,7 @@ class DataGateway:
         deadline_seconds: float,
         *,
         extra_scope: str | None = None,
+        exclude: frozenset[str] = frozenset(),
     ) -> bytes:
         # The route-specific Data Plane entitlement is always requested explicitly.
         scope = (
@@ -177,7 +185,7 @@ class DataGateway:
         )
         return await self._client.post_json(
             path,
-            query.model_dump(mode="json"),
+            query.model_dump(mode="json", exclude=set(exclude) or None),
             timeout_seconds=deadline_seconds,
             extra_scope=scope,
         )

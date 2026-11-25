@@ -27,12 +27,15 @@ from stram_data.data_interface import (
 
 MAX_SPAN_DAYS = 1830
 MAX_RESULT_ROWS = 500
+# quant_get_series only: the Data Interface MAX_LIMIT, so five years of daily closes is one call.
+MAX_SERIES_ROWS = 5000
 DEFAULT_RESULT_ROWS = 100
 MAX_CATALOG_ROWS = 500
 
 AvailabilityMode = Literal["strict", "estimated", "ex_post"]
 # The view selects the response shape only; the Data Interface never sees it.
 ViewMode = Literal["raw", "clean"]
+SeriesOrder = Literal["asc", "desc"]
 Dataset = Literal["economic_observation", "market_bar", "positioning_report"]
 Kind = Literal["economic", "rates", "market_bar", "positioning", "derived"]
 Key = Annotated[
@@ -91,8 +94,9 @@ class SeriesInput(DateRangeInput):
     provider: Key | None = None
     as_of: date | None = None
     all_versions: bool = False
-    limit: int = Field(default=DEFAULT_RESULT_ROWS, ge=1, le=MAX_RESULT_ROWS)
+    limit: int = Field(default=DEFAULT_RESULT_ROWS, ge=1, le=MAX_SERIES_ROWS)
     availability: AvailabilityMode = "strict"
+    order: SeriesOrder = "asc"
     view: ViewMode = "raw"
 
     @model_validator(mode="after")

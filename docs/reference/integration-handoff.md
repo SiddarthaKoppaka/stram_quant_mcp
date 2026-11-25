@@ -138,7 +138,7 @@ not the data):
 ```json
 {
   "tool_version": "0.1.0",
-  "stram_data_version": "1.12.0",
+  "stram_data_version": "1.16.0",
   "interface_version": "1",
   "policy_version": "availability-policy-hash",
   "request_id": "server-generated-id",
@@ -238,7 +238,7 @@ results inside `data`, not errors. A missing quote or value means no conclusion 
 | Item | State |
 |---|---|
 | Environment | Staging on SIDDU, tailnet only. The build that calls the Data Plane over HTTP is deployed by the operator; the repository's full acceptance check (`verify`) and rollback drill are not yet confirmed |
-| Versions | MCP 0.1.0, Data Plane 1.12.0, Data Interface v1; the MCP refuses to start against a Data Plane older than 1.11 |
+| Versions | MCP 0.1.0, Data Plane 1.16.0, Data Interface v1; the MCP refuses to start against a Data Plane older than 1.11 |
 | Production | Identity, hostname, TLS and approval are undecided |
 | End-user identity | Not configured (section 3); the Data Plane sees the MCP, not the user |
 | Market quotes and trades | Not exposed: real-time ingestion is not deployed |

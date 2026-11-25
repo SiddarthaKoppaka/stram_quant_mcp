@@ -6,8 +6,8 @@ FROM ${PYTHON_BASE} AS builder
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 RUN sed -i \
-      -e 's|http://deb.debian.org/debian-security|https://snapshot.debian.org/archive/debian-security/20261114T000000Z|g' \
-      -e 's|http://deb.debian.org/debian|https://snapshot.debian.org/archive/debian/20261114T000000Z|g' \
+      -e 's|http://deb.debian.org/debian-security|https://snapshot.debian.org/archive/debian-security/20261124T000000Z|g' \
+      -e 's|http://deb.debian.org/debian|https://snapshot.debian.org/archive/debian/20261124T000000Z|g' \
       /etc/apt/sources.list.d/debian.sources \
     && echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries \
     && apt-get update \
@@ -18,7 +18,7 @@ RUN sed -i \
 WORKDIR /build
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
-COPY vendor/stram_data-1.12.0-py3-none-any.whl /wheels/stram_data-1.12.0-py3-none-any.whl
+COPY vendor/stram_data-1.16.0-py3-none-any.whl /wheels/stram_data-1.16.0-py3-none-any.whl
 RUN uv export --frozen --no-dev --no-emit-project \
       --no-emit-package stram-data --no-emit-package confluent-kafka \
       --no-emit-package psycopg-binary \
@@ -27,9 +27,9 @@ RUN uv export --frozen --no-dev --no-emit-project \
     && uv pip install --python /opt/venv/bin/python \
       --requirements /tmp/runtime-requirements.txt \
     && uv pip install --python /opt/venv/bin/python --no-deps \
-      /wheels/stram_data-1.12.0-py3-none-any.whl . \
+      /wheels/stram_data-1.16.0-py3-none-any.whl . \
     && /opt/venv/bin/python -c \
-      'import stram_data; assert stram_data.__version__ == "1.12.0"'
+      'import stram_data; assert stram_data.__version__ == "1.16.0"'
 
 FROM ${PYTHON_BASE} AS runtime
 
@@ -39,11 +39,11 @@ LABEL org.opencontainers.image.title="Stram Quant MCP" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.base.name="python:3.12.12-slim-bookworm" \
       org.opencontainers.image.base.digest="sha256:593bd06efe90efa80dc4eee3948be7c0fde4134606dd40d8dd8dbcade98e669c" \
-      io.stram.debian.snapshot="20261114T000000Z"
+      io.stram.debian.snapshot="20261124T000000Z"
 
 RUN sed -i \
-      -e 's|http://deb.debian.org/debian-security|https://snapshot.debian.org/archive/debian-security/20261114T000000Z|g' \
-      -e 's|http://deb.debian.org/debian|https://snapshot.debian.org/archive/debian/20261114T000000Z|g' \
+      -e 's|http://deb.debian.org/debian-security|https://snapshot.debian.org/archive/debian-security/20261124T000000Z|g' \
+      -e 's|http://deb.debian.org/debian|https://snapshot.debian.org/archive/debian/20261124T000000Z|g' \
       /etc/apt/sources.list.d/debian.sources \
     && echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries \
     && apt-get update \
